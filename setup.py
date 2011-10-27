@@ -11,12 +11,17 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-name, version = 'zc.', '0'
+name, version = 'zc.resumelb', '0'
 
-install_requires = ['setuptools']
-extras_require = dict(test=['zope.testing'])
+install_requires = ['setuptools', 'gevent']
+extras_require = dict(test=['zope.testing', 'bobo'])
 
 entry_points = """
+[console_scripts]
+resumelb = zc.resumelb.lb:main
+
+[paste.server_runner]
+main = zc.resumelb.worker:server_runner
 """
 
 from setuptools import setup
