@@ -31,9 +31,14 @@ def read_message(sock):
 
     return rno, marshal.loads(data)
 
-def write_message(sock, rno, data):
-    data = marshal.dumps(data)
-    data = pack(">II", rno, len(data))+data
+def write_message(sock, rno, *a):
+    to_send = []
+    for data in a:
+        data = marshal.dumps(data)
+        to_send.append(pack(">II", rno, len(data)))
+        to_send.append(data)
+
+    data = ''.join(to_send)
     while data:
         try:
             sent = sock.send(data)
