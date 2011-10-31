@@ -31,6 +31,7 @@ class Worker(zc.resumelb.util.Worker):
     def connect(self, addr):
         socket = gevent.socket.create_connection(addr)
         readers = self.connected(socket)
+        self.put((0, self.resume))
 
         while self.connected:
             try:
@@ -44,7 +45,7 @@ class Worker(zc.resumelb.util.Worker):
                 env = data
                 env['zc.resumelb.time'] = time.time()
                 env['zc.resumelb.lb_addr'] = self.addr
-                gevent.Greenlet.spawn(self.handle, rno, self.start(rno), env)
+                gevent.spawn(self.handle, rno, self.start(rno), env)
             else:
                 rput(data)
 
@@ -64,6 +65,7 @@ class Worker(zc.resumelb.util.Worker):
                 return
             else:
                 break
+        f.seek(0)
 
         def start_response(status, headers, exc_info=None):
             assert not exc_info # XXX
@@ -74,8 +76,9 @@ class Worker(zc.resumelb.util.Worker):
                 self.put((rno, data))
 
             self.put((rno, ''))
+            self.readers.pop(rno)
 
-            elapsed = time.time() - env['zc.resumelb.time']
+            elapsed = max(time.time() - env['zc.resumelb.time'], 1e-9)
             time_ring = self.time_ring
             time_ring_pos = rno % self.time_ring_size
             rclass = env['zc.resumelb.request_class']
@@ -107,5 +110,4 @@ def server_runner(app, global_conf, lb, history=500): # paste deploy hook
     logging.basicConfig(level=logging.INFO)
     host, port = lb.split(':')
     Worker(app, (host, int(port)), history)
-    gevent.hub.get_hub().switch()
 
