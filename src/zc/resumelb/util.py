@@ -70,7 +70,7 @@ class Worker:
         writeq = gevent.queue.Queue()
         gevent.Greenlet.spawn(writer, writeq, socket, self)
         self.put = writeq.put
-        self.connected = True
+        self.is_connected = True
         return self.readers
 
     def __len__(self):
@@ -92,7 +92,7 @@ class Worker:
 
     def disconnected(self):
         logger.info('worker disconnected %s', self.addr)
-        self.connected = False
+        self.is_connected = False
         for put in self.readers.itervalues():
             put(None)
 

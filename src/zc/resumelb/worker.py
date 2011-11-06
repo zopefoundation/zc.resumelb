@@ -33,7 +33,7 @@ class Worker(zc.resumelb.util.Worker):
         readers = self.connected(socket)
         self.put((0, self.resume))
 
-        while self.connected:
+        while self.is_connected:
             try:
                 rno, data = zc.resumelb.util.read_message(socket)
             except gevent.GreenletExit:

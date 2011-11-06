@@ -220,3 +220,6 @@ In this example, we've also requested a very large output.
     Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     1200000
+
+
+XXX Need disconnect/connect test
