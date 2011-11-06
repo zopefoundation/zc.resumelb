@@ -1,0 +1,204 @@
+Resume-based load balancer pool
+===============================
+
+The heart of the resume-based load balancer is the pool, which
+implements the load balancing algorithm.  The pool has a collection of
+workers organized according to their resumes.
+
+The load balancer works by accepting remote worker connections and
+adding local workers to the pool, and by accepting wsgi request,
+getting local workers from the pool and passing the wsgi requests to
+the local workers, which, in term, forwward the requests to the remote
+workers.
+
+We'll test the pool with stand-ins for the local workers.
+
+    >>> import zc.resumelb.lb
+    >>> pool = zc.resumelb.lb.Pool(max_backlog=5)
+
+We specified a maximum per-worker backlog for the pool.  We specified
+a fairly low max backlog to make it easier to see what happens when
+a worker gets too backed up.
+
+The get method is used to get a worker from the pool.  A request class
+and an optional timeout is passed. (The timeout is mainly useful for
+testing.)
+
+    >>> pool.get('foo', 0.0)
+
+We didn't get a worker (we timed out), because we haven't added one.
+
+    >>> class Worker:
+    ...     def __init__(self, name):
+    ...         self.name = name
+    ...     def __repr__(self):
+    ...         return self.name
+    ...     def __cmp__(self, other):
+    ...         return cmp(self.name, other.name)
+    ...     def __hash__(self):
+    ...         return hash(self.name)
+
+    >>> w1 = Worker('w1')
+    >>> pool.new_resume(w1, {})
+
+As far as the pool is concerned, any object that can be in a set or be
+used as a dictionary key can be used as a worker.  The pool doesn't
+care.  We could have used ``object`` as out worker class, but we
+constructed a worker class that makes testing output more useful.
+
+    >>> pool.get('foo', 0.0)
+    w1
+
+ This time, we got the one we registered.
+
+ If we create another and register it, we'll still get the original:
+
+    >>> w2 = Worker('w2')
+    >>> pool.new_resume(w2, {})
+
+    >>> pool.get('foo')
+    w1
+
+ This is because w1 is known to be good at handling foo requests.
+
+ We'll get w2 if we pick a different request class:
+
+    >>> pool.get('bar')
+    w2
+
+ We're gonna be white box and look at the pool data structures from
+ time to time.
+
+    >>> pool
+    Request classes:
+      bar: w2(1.0,1)
+      foo: w1(1.0,2)
+    Backlogs:
+      1: [w2]
+      2: [w1]
+
+Here, we can see that w1 is used for the foo class and w2 for the bar
+class.  Let's add another worker:
+
+    >>> w3 = Worker('w3')
+    >>> pool.new_resume(w3, {})
+
+and make some more foo requests:
+
+    >>> [pool.get('foo') for i in range(3)]
+    [w1, w1, w1]
+
+    >>> pool
+    Request classes:
+      bar: w2(1.0,1)
+      foo: w1(1.0,5)
+    Backlogs:
+      0: [w3]
+      1: [w2]
+      5: [w1]
+
+Even though we still had a worker with no backlog, we kept sending
+requests to w1.  But but now, w1 has reached it's maximum backlog.  If
+we make another foo request, we'll start using w3, and when that's
+reached it's maximum backlog, we'll start using w2:
+
+    >>> [pool.get('foo') for i in range(7)]
+    [w3, w3, w3, w3, w3, w2, w2]
+
+    >>> pool
+    Request classes:
+      bar: w2(1.0,3)
+      foo: w1(1.0,5), w2(1.0,3), w3(1.0,5)
+    Backlogs:
+      3: [w2]
+      5: [w1, w3]
+
+If we get all workers to the maximum backlog, we'll block until a
+worker is free.
+
+    >>> [pool.get('foo') for i in range(2)]
+    [w2, w2]
+
+    >>> pool.get('foo', 0.0)
+
+When a worker is done doing it's work, we put it back in the pool:
+
+    >>> pool.put(w1)
+    >>> pool.put(w1)
+    >>> pool.put(w1)
+    >>> pool.put(w2)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
+    >>> pool
+    Request classes:
+      bar: w2(1.0,4)
+      foo: w1(1.0,2), w2(1.0,4), w3(1.0,3)
+    Backlogs:
+      2: [w1]
+      3: [w3]
+      4: [w2]
+
+Now, when we get a worker, we'll get w3.
+
+    >>> pool.get('foo', 0.0)
+    w3
+
+Why? We adjust each score by the worker's backlog and search workers
+from high score to low until the adjusted score increases. Because w2
+has a higher backlog than w3, it's adjusted score is lower so we stop
+looking.  This is for 2 reasons:
+
+1. We want to bias selection towards a smaller number of workers,
+   ideally those with the best scores,
+
+2. We want to reduce the amount of work done in each get call.
+
+Now that we've done some work, let's updaye the resumes.  This will
+normally be done by workers after periodically collecting performance
+data.
+
+    >>> pool.new_resume(w1, {'foo': 3.0})
+
+    >>> pool.new_resume(w2, {'bar': 1.0, 'foo': 1.0})
+
+    >>> pool.new_resume(w3, {'foo': 2.0})
+
+    pool
+    Request classes:
+      bar: w2(1.0,4)
+      foo: w2(1.0,4), w3(2.0,4), w1(3.0,2)
+    Backlogs:
+      2: [w1]
+      4: [w2, w3]
+
+    >>> [pool.get('foo') for i in range(5)]
+    [w1, w1, w1, w3, w2]
+
+    >>> pool.put(w1)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
+    >>> pool
+    Request classes:
+      bar: w2(1.0,5)
+      foo: w2(1.0,5), w3(2.0,0), w1(3.0,4)
+    Backlogs:
+      0: [w3]
+      4: [w1]
+      5: [w2]
+
+    >>> [pool.get('foo') for i in range(5)]
+    [w3, w3, w3, w1, w3]
+
+When a worker disconnect, it's removed from the pool:
+
+    >>> pool.remove(w1)
+    >>> pool
+    Request classes:
+      bar: w2(1.0,5)
+      foo: w2(1.0,5), w3(2.0,4)
+    Backlogs:
+      4: [w3]
+      5: [w2]

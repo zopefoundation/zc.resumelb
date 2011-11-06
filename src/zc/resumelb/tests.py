@@ -53,7 +53,9 @@ def test_suite():
     return unittest.TestSuite((
         manuel.testing.TestSuite(
             manuel.doctest.Manuel() + manuel.capture.Manuel(),
-            'worker.test',
+            *(sorted(name for name in os.listdir(os.path.dirname(__file__))
+                     if name.endswith('.test')
+                     )),
             setUp=setUp),
         ))
 
