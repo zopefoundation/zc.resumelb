@@ -16,7 +16,9 @@ class LB:
     def __init__(self, worker_addr, classifier):
         self.classifier = classifier
         self.pool = Pool()
-        gevent.server.StreamServer(worker_addr, self.handle_worker).start()
+        self.worker_server = gevent.server.StreamServer(
+            worker_addr, self.handle_worker)
+        self.worker_server.start()
 
     def handle_worker(self, socket, addr):
         logger.info('new worker')

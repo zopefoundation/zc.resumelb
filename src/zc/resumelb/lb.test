@@ -1,0 +1,174 @@
+Basic LB tests
+==============
+
+The LB algorithm us tested in pool.test.  This file aims to test the
+networking aspects of the LB.
+
+We'll start by creating a load balencer:
+
+    >>> import zc.resumelb.lb
+    >>> lb = zc.resumelb.lb.LB(('127.0.0.1', 0), zc.resumelb.lb.host_classifier)
+
+Now, we'll create a couple of sockets representing workers:
+
+    >>> import gevent.socket
+    >>> from zc.resumelb.util import read_message, write_message
+    >>> worker1 = gevent.socket.create_connection(
+    ...    ('127.0.0.1', lb.worker_server.server_port))
+    >>> write_message(worker1, 0, {'h1.com': 1.0})
+
+    >>> worker2 = gevent.socket.create_connection(
+    ...    ('127.0.0.1', lb.worker_server.server_port))
+    >>> write_message(worker2, 0, {'h2.com': 1.0})
+
+Now, let's make a request and make sure the data gets where it's
+supposed to go.
+
+    >>> import webtest
+    >>> app1 = webtest.TestApp(lb.handle_wsgi)
+    >>> g1 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
+
+    >>> rno, env1 = read_message(worker1)
+    >>> rno
+    1
+    >>> from pprint import pprint
+    >>> pprint(env1)
+    {'HTTP_HOST': 'h1.com',
+     'PATH_INFO': '/hi.html',
+     'QUERY_STRING': '',
+     'REQUEST_METHOD': 'GET',
+     'SCRIPT_NAME': '',
+     'SERVER_NAME': 'localhost',
+     'SERVER_PORT': '80',
+     'SERVER_PROTOCOL': 'HTTP/1.0',
+     'paste.testing': True,
+     'paste.testing_variables': {},
+     'paste.throw_errors': True,
+     'wsgi.multiprocess': False,
+     'wsgi.multithread': False,
+     'wsgi.run_once': False,
+     'wsgi.url_scheme': 'http',
+     'wsgi.version': (1, 0),
+     'zc.resumelb.request_class': 'h1.com'}
+
+Because this is a get, the body is empty:
+
+    >>> read_message(worker1)
+    (1, '')
+
+If we another request for the same host, it will appear on the same
+socket.  This time, we'll make a request that provides a large body:
+
+    >>> app2 = webtest.TestApp(lb.handle_wsgi)
+    >>> g2 = gevent.spawn(
+    ...     app2.put, '/hi.html', 'i'*200000, [('Host', 'h1.com')])
+
+    >>> rno, env2 = read_message(worker1)
+    >>> rno
+    2
+    >>> pprint(env2)
+    {'CONTENT_LENGTH': '200000',
+     'CONTENT_TYPE': 'application/x-www-form-urlencoded',
+     'HTTP_HOST': 'h1.com',
+     'PATH_INFO': '/hi.html',
+     'QUERY_STRING': '',
+     'REQUEST_METHOD': 'PUT',
+     'SCRIPT_NAME': '',
+     'SERVER_NAME': 'localhost',
+     'SERVER_PORT': '80',
+     'SERVER_PROTOCOL': 'HTTP/1.0',
+     'paste.testing': True,
+     'paste.testing_variables': {},
+     'paste.throw_errors': True,
+     'wsgi.multiprocess': False,
+     'wsgi.multithread': False,
+     'wsgi.run_once': False,
+     'wsgi.url_scheme': 'http',
+     'wsgi.version': (1, 0),
+     'zc.resumelb.request_class': 'h1.com'}
+
+    >>> rno, data = read_message(worker1)
+    >>> rno, len(data), data == 'i'*len(data)
+    (2, 65536, True)
+
+    >>> rno, data = read_message(worker1)
+    >>> rno, len(data), data == 'i'*len(data)
+    (2, 65536, True)
+
+    >>> rno, data = read_message(worker1)
+    >>> rno, len(data), data == 'i'*len(data)
+    (2, 65536, True)
+
+    >>> rno, data = read_message(worker1)
+    >>> rno, len(data), data == 'i'*len(data)
+    (2, 3392, True)
+
+    >>> read_message(worker1)
+    (2, '')
+
+
+If we make a request to h2.com, we'll get the request on worker2:
+
+    >>> app3 = webtest.TestApp(lb.handle_wsgi)
+    >>> g3 = gevent.spawn(app3.get, '/hi.html', {}, [('Host', 'h2.com')])
+
+    >>> rno, env3 = read_message(worker2)
+    >>> rno
+    1
+    >>> pprint(env3)
+    {'HTTP_HOST': 'h2.com',
+     'PATH_INFO': '/hi.html',
+     'QUERY_STRING': '',
+     'REQUEST_METHOD': 'GET',
+     'SCRIPT_NAME': '',
+     'SERVER_NAME': 'localhost',
+     'SERVER_PORT': '80',
+     'SERVER_PROTOCOL': 'HTTP/1.0',
+     'paste.testing': True,
+     'paste.testing_variables': {},
+     'paste.throw_errors': True,
+     'wsgi.multiprocess': False,
+     'wsgi.multithread': False,
+     'wsgi.run_once': False,
+     'wsgi.url_scheme': 'http',
+     'wsgi.version': (1, 0),
+     'zc.resumelb.request_class': 'h2.com'}
+
+    >>> read_message(worker2)
+    (1, '')
+
+Now, let's start sending back some data
+
+    >>> import webob
+    >>> response = webob.Response('Hello world\n')
+    >>> write_message(worker2, 1, (response.status, response.headers.items()))
+    >>> write_message(worker2, 1, response.body)
+    >>> write_message(worker2, 1, '')
+    >>> g3.join()
+    >>> g3.value
+    <200 OK text/html body='Hello world\n'>
+
+We'll interleave data for the 2 responses on worker1
+
+    >>> response1 = webob.Response('1'*10000)
+    >>> write_message(worker1, 1, (response1.status, response1.headers.items()))
+    >>> response2 = webob.Response('2'*10000)
+    >>> write_message(worker1, 2, (response2.status, response2.headers.items()))
+
+    >>> for i in range(10):
+    ...     write_message(worker1, 1, '1'*1000)
+    ...     write_message(worker1, 2, '2'*1000)
+
+    >>> write_message(worker1, 1, '')
+    >>> write_message(worker1, 2, '')
+
+    >>> g1.join()
+    >>> g1.value.status, g1.value.body == '1'*10000
+    ('200 OK', True)
+
+    >>> g2.join()
+    >>> g2.value.status, g2.value.body == '2'*10000
+    ('200 OK', True)
+
+
+
