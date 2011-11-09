@@ -170,5 +170,74 @@ We'll interleave data for the 2 responses on worker1
     >>> g2.value.status, g2.value.body == '2'*10000
     ('200 OK', True)
 
+Worker disconnection
+====================
 
+When a worker disconnects from a running lb, any pending GET or HEAD
+requests are resubmitted to another worker. All other requests
+generate a 500 response.
+
+    >>> greenlets = []
+    >>> for method in ('GET', 'HEAD', 'PUT', 'POST', 'DELETE',
+    ...                'OPTIONS', 'TRACE'):
+    ...     app = webtest.TestApp(lb.handle_wsgi)
+    ...     greenlets.append(
+    ...         gevent.spawn(app.request, '/hi.html', method=method,
+    ...                      headers=[('Host', 'h1.com')], status='*'))
+    ...     rno, data = read_message(worker1)
+    ...     rno2, blank = read_message(worker1)
+    ...     if rno2 != rno or blank != '':
+    ...         print 'oops', (rno2, blank)
+    ...     print rno, type(data)
+    3 <type 'dict'>
+    4 <type 'dict'>
+    5 <type 'dict'>
+    6 <type 'dict'>
+    7 <type 'dict'>
+    8 <type 'dict'>
+    9 <type 'dict'>
+
+Now, we'll disconnect worker1:
+
+    >>> worker1.close()
+
+The GET and HEAD request will be send to worker2:
+
+    >>> rno1, env1 = read_message(worker2)
+    >>> rno, blank = read_message(worker2)
+    ... if rno != rno1 or blank != '':
+    ...     print 'oops', (rno, blank)
+
+    >>> rno2, env2 = read_message(worker2)
+    >>> rno, blank = read_message(worker2)
+    ... if rno != rno2 or blank != '':
+    ...     print 'oops', (rno, blank)
+
+    >>> sorted((env1['REQUEST_METHOD'], env2['REQUEST_METHOD']))
+    ['GET', 'HEAD']
+
+    >>> response = webob.Response('Hello test\n')
+    >>> for (rno, env) in ((rno1, env1), (rno2, env2)):
+    ...     write_message(worker2, rno,
+    ...                   (response.status, response.headers.items()))
+    ...     if env['REQUEST_METHOD'] == 'GET':
+    ...         write_message(worker2, rno, response.body)
+    ...     write_message(worker2, rno, '')
+
+    >>> for g in greenlets:
+    ...    g.join()
+    ...    print repr(g.value)
+    <200 OK text/html body='Hello test\n'>
+    <200 OK text/html no body>
+    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
+    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
+    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
+    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
+    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
+
+    >>> print greenlets[2].value.body
+    <html><body>
+    The server was unable to handle your request due to a transient failure.
+    Please try again.
+    </body></html>
 

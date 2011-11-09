@@ -13,9 +13,9 @@
 ##############################################################################
 name, version = 'zc.resumelb', '0'
 
-install_requires = ['setuptools', 'gevent']
+install_requires = ['setuptools', 'gevent', 'WebOb']
 extras_require = dict(
-    test=['zope.testing', 'bobo', 'WebOb', 'manuel', 'WebTest'])
+    test=['zope.testing', 'bobo', 'manuel', 'WebTest'])
 
 entry_points = """
 [console_scripts]

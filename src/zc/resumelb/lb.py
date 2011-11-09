@@ -5,16 +5,27 @@ import gevent.pywsgi
 import gevent.server
 import logging
 import sys
+import webob
 import zc.resumelb.util
 
 block_size = 1<<16
 
 logger = logging.getLogger(__name__)
 
+retry_methods = set(('GET', 'HEAD'))
+
+default_disconnect_message = """
+The server was unable to handle your request due to a transient failure.
+Please try again.
+"""
+
 class LB:
 
-    def __init__(self, worker_addr, classifier):
+    def __init__(self, worker_addr, classifier,
+                 disconnect_message=default_disconnect_message
+                 ):
         self.classifier = classifier
+        self.disconnect_message = disconnect_message
         self.pool = Pool()
         self.worker_server = gevent.server.StreamServer(
             worker_addr, self.handle_worker)
@@ -35,11 +46,18 @@ class LB:
             except worker.Disconnected:
                 # XXX need to be more careful about whether
                 # start_response was called.
-                if int(env.get(CONTENT_LENGTH, None)) == 0:
+                if (int(env.get('CONTENT_LENGTH', 0)) == 0 and
+                    env.get('REQUEST_METHOD') in retry_methods
+                    ):
                     logger.info("retrying %s", env)
                 else:
-                    raise
-            finally:
+                    return webob.Response(
+                        status = '502 Bad Gateway',
+                        content_type= 'text/html',
+                        body = ("<html><body>%s</body></html>"
+                                % self.disconnect_message)
+                        )(env, start_response)
+            else:
                 self.pool.put(worker)
 
 class Pool:
