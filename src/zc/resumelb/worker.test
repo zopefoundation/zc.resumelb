@@ -11,6 +11,7 @@ data going to and from the worker.
 
     >>> server = gevent.server.StreamServer(('127.0.0.1', 0), handle)
     >>> server.start()
+    >>> server_port = server.server_port
 
 Now, we can start a worker:
 
@@ -18,7 +19,7 @@ Now, we can start a worker:
     >>> worker = gevent.spawn(
     ...   zc.resumelb.worker.Worker,
     ...   zc.resumelb.tests.app(),
-    ...   ('127.0.0.1', server.server_port),
+    ...   ('127.0.0.1', server_port),
     ...   history=5)
 
 Here we created a worker using a test application, telling it to
@@ -59,7 +60,7 @@ environments. We'll use webob to help us set this up.
 
 The newenv helper:
 
-- Creates a request enviton
+- Creates a request environ
 - without input or error streams
 - with a passed request class. The request class is needed for the resume.
 
@@ -190,13 +191,8 @@ resume after 5 requests.  Let's test that by making a 5th request.
 The next message we recieve will be the new resume:
 
     >>> zero, resume = read_message(worker_socket)
-    >>> zero == zero
-    True
-    >>> resume.keys()
-    ['', '1', '2']
-
-    >>> [x for x in resume.values() if type(x) != float]
-    []
+    >>> zero, resume.keys(), [x for x in resume.values() if type(x) != float]
+    (0, ['', '1', '2'], [])
 
     >>> resume[''] > 10, resume['1'] > 10, resume['2'] < 10
     (True, True, True)
@@ -221,5 +217,35 @@ In this example, we've also requested a very large output.
     <BLANKLINE>
     1200000
 
+Reconnection
+============
 
-XXX Need disconnect/connect test
+If a worker is disconnected, it will automatically reconnect:
+
+    >>> worker_socket_result = gevent.event.AsyncResult()
+    >>> worker_socket.close()
+    >>> worker_socket = worker_socket_result.get()
+
+and send it's resume:
+
+    >>> zero, resume = read_message(worker_socket)
+    >>> zero, resume.keys(), [x for x in resume.values() if type(x) != float]
+    (0, ['', '1', '2'], [])
+    >>> resume[''] > 10, resume['1'] > 10, resume['2'] < 10
+    (True, True, True)
+
+We can even stop the server for a while, and the worker will
+reconnect:
+
+    >>> server.stop()
+    >>> worker_socket.close()
+    >>> gevent.sleep(3)
+    >>> worker_socket_result = gevent.event.AsyncResult()
+    >>> server = gevent.server.StreamServer(('127.0.0.1', server_port), handle)
+    >>> server.start()
+    >>> worker_socket = worker_socket_result.get()
+    >>> zero, resume = read_message(worker_socket)
+    >>> zero, resume.keys(), [x for x in resume.values() if type(x) != float]
+    (0, ['', '1', '2'], [])
+    >>> resume[''] > 10, resume['1'] > 10, resume['2'] < 10
+    (True, True, True)
