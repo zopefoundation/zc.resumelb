@@ -13,7 +13,7 @@
 ##############################################################################
 name, version = 'zc.resumelb', '0'
 
-install_requires = ['setuptools', 'gevent', 'WebOb']
+install_requires = ['setuptools', 'gevent', 'WebOb', 'zc.thread']
 extras_require = dict(
     test=['zope.testing', 'bobo', 'manuel', 'WebTest'])
 
