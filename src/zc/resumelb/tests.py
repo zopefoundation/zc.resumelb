@@ -14,6 +14,7 @@
 import bobo
 import doctest
 import gevent
+import hashlib
 import manuel.capture
 import manuel.doctest
 import manuel.testing
@@ -28,7 +29,7 @@ pid = os.getpid()
 def hi(request):
     body = request.environ['wsgi.input'].read()
     return "\n\n%s -> %s %s %s\n\n" % (
-        request.url, pid, len(body), hash(body))
+        request.url, pid, len(body), hashlib.sha1(body).hexdigest())
 
 @bobo.query('/gen.html')
 def gen(size=0):

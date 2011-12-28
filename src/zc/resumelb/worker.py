@@ -7,16 +7,17 @@ import logging
 import socket
 import sys
 import time
+import zc.mappingobject
 import zc.resumelb.util
 
 logger = logging.getLogger(__name__)
 
 class Worker(zc.resumelb.util.Worker):
 
-    def __init__(self, app, addr, history):
+    def __init__(self, app, addr, settings):
         self.app = app
+        self.settings = zc.mappingobject.mappingobject(settings)
         self.resume = {}
-        self.time_ring_size = history
         self.time_ring = []
         self.time_ring_pos = 0
         while 1:
@@ -80,7 +81,7 @@ class Worker(zc.resumelb.util.Worker):
 
             elapsed = max(time.time() - env['zc.resumelb.time'], 1e-9)
             time_ring = self.time_ring
-            time_ring_pos = rno % self.time_ring_size
+            time_ring_pos = rno % self.settings.history
             rclass = env['zc.resumelb.request_class']
             try:
                 time_ring[time_ring_pos] = rclass, elapsed
@@ -88,7 +89,7 @@ class Worker(zc.resumelb.util.Worker):
                 while len(time_ring) <= time_ring_pos:
                     time_ring.append((rclass, elapsed))
 
-            if rno % self.time_ring_size == 0:
+            if rno % self.settings.history == 0:
                 byrclass = {}
                 for rclass, elapsed in time_ring:
                     sumn = byrclass.get(rclass)
@@ -109,5 +110,5 @@ class Worker(zc.resumelb.util.Worker):
 def server_runner(app, global_conf, lb, history=500): # paste deploy hook
     logging.basicConfig(level=logging.INFO)
     host, port = lb.split(':')
-    Worker(app, (host, int(port)), history)
+    Worker(app, (host, int(port)), dict(history=history))
 

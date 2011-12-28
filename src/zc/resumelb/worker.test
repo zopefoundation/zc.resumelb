@@ -20,7 +20,7 @@ Now, we can start a worker:
     ...   zc.resumelb.worker.Worker,
     ...   zc.resumelb.tests.app(),
     ...   ('127.0.0.1', server_port),
-    ...   history=5)
+    ...   dict(history=5))
 
 Here we created a worker using a test application, telling it to
 connect to our server address and to update it's resume after every
@@ -102,12 +102,12 @@ The worker will process the request and send back 3 records:
 
     >>> print_response(worker_socket, 1)
     1 200 OK
-    Content-Length: 40
+    Content-Length: 79
     Content-Type: text/html; charset=UTF-8; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
-    http://localhost/hi.html -> 6115 0 0
+    http://localhost/hi.html -> 6115 0 da39a3ee5e6b4b0d3255bfef95601890afd80709
     <BLANKLINE>
 
 We can have multiple outstanding requests:
@@ -125,8 +125,15 @@ At this point, we have 3 outstading requests.  Let's create 3 bodies:
     >>> b3 = 'y'*10000
     >>> b4 = 'z'*100000
 
-    >>> hash(b2), hash(b3), hash(b4)
-    (8412291732507076776, 5203428436375121216, -3961752530033413152)
+    >>> import hashlib
+    >>> sha1 = lambda s: hashlib.sha1(s).hexdigest()
+
+    >>> sha1(b2)
+    'c3efa690fa3fdd2e2526853eed670538ea127638'
+    >>> sha1(b3)
+    'c1d5e830a1027a7b5de9e0620f3a2497d6b60c3e'
+    >>> sha1(b4)
+    '3235771c66bf77697df635e1bce4173668d2ea32'
 
 and send them:
 
@@ -139,36 +146,39 @@ and send them:
     ...     write_message(worker_socket, 4, b4[i*10000:(i+1)*10000])
 
     >>> write_message(worker_socket, 4, '')
-    >>> print_response(worker_socket, 4)
+    >>> print_response(worker_socket, 4) # doctest: +NORMALIZE_WHITESPACE
     4 200 OK
-    Content-Length: 64
+    Content-Length: 84
     Content-Type: text/html; charset=UTF-8; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
-    http://localhost/hi.html -> 6115 100000 -3961752530033413152
+    http://localhost/hi.html ->
+    6115 100000 3235771c66bf77697df635e1bce4173668d2ea32
     <BLANKLINE>
 
     >>> write_message(worker_socket, 2, '')
-    >>> print_response(worker_socket, 2)
+    >>> print_response(worker_socket, 2) # doctest: +NORMALIZE_WHITESPACE
     2 200 OK
-    Content-Length: 61
+    Content-Length: 82
     Content-Type: text/html; charset=UTF-8; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
-    http://localhost/hi.html -> 6115 1000 8412291732507076776
+    http://localhost/hi.html ->
+    6115 1000 c3efa690fa3fdd2e2526853eed670538ea127638
     <BLANKLINE>
 
     >>> write_message(worker_socket, 3, '')
-    >>> print_response(worker_socket, 3)
+    >>> print_response(worker_socket, 3) # doctest: +NORMALIZE_WHITESPACE
     3 200 OK
-    Content-Length: 62
+    Content-Length: 83
     Content-Type: text/html; charset=UTF-8; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
-    http://localhost/hi.html -> 6115 10000 5203428436375121216
+    http://localhost/hi.html ->
+    6115 10000 c1d5e830a1027a7b5de9e0620f3a2497d6b60c3e
     <BLANKLINE>
 
 The handler for hi.html outputs the url, the pid, the request body
