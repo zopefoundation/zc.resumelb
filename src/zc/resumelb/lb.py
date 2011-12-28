@@ -42,7 +42,9 @@ class LB:
         while 1:
             worker = self.pool.get(rclass)
             try:
-                return worker.handle(rclass, env, start_response)
+                result = worker.handle(rclass, env, start_response)
+                self.pool.put(worker)
+                return result
             except worker.Disconnected:
                 # XXX need to be more careful about whether
                 # start_response was called.
@@ -57,8 +59,6 @@ class LB:
                         body = ("<html><body>%s</body></html>"
                                 % self.disconnect_message)
                         )(env, start_response)
-            else:
-                self.pool.put(worker)
 
 class Pool:
 

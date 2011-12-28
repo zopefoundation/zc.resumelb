@@ -170,6 +170,15 @@ We'll interleave data for the 2 responses on worker1
     >>> g2.value.status, g2.value.body == '2'*10000
     ('200 OK', True)
 
+Pool Management
+===============
+
+At this point, there are no outstanding requests.  The pool back-logs
+should all be 0:
+
+    >>> sum(lb.pool.backlogs.values())
+    0
+
 Worker disconnection
 ====================
 
