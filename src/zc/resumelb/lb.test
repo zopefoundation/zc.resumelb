@@ -15,11 +15,11 @@ Now, we'll create a couple of sockets representing workers:
     >>> from zc.resumelb.util import read_message, write_message
     >>> worker1 = gevent.socket.create_connection(
     ...    ('127.0.0.1', lb.worker_server.server_port))
-    >>> write_message(worker1, 0, {'h1.com': 1.0})
+    >>> write_message(worker1, 0, {'h1.com': 10.0})
 
     >>> worker2 = gevent.socket.create_connection(
     ...    ('127.0.0.1', lb.worker_server.server_port))
-    >>> write_message(worker2, 0, {'h2.com': 1.0})
+    >>> write_message(worker2, 0, {'h2.com': 10.0})
 
 Now, let's make a request and make sure the data gets where it's
 supposed to go.
@@ -64,6 +64,7 @@ socket.  This time, we'll make a request that provides a large body:
     ...     app2.put, '/hi.html', 'i'*200000, [('Host', 'h1.com')])
 
     >>> rno, env2 = read_message(worker1)
+
     >>> rno
     2
     >>> pprint(env2)
@@ -176,7 +177,7 @@ Pool Management
 At this point, there are no outstanding requests.  The pool back-logs
 should all be 0:
 
-    >>> sum(lb.pool.backlogs.values())
+    >>> sum(worker.backlog for worker in lb.pool.workers)
     0
 
 Worker disconnection

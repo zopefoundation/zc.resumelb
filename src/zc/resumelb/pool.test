@@ -14,7 +14,7 @@ workers.
 We'll test the pool with stand-ins for the local workers.
 
     >>> import zc.resumelb.lb
-    >>> pool = zc.resumelb.lb.Pool(max_backlog=5)
+    >>> pool = zc.resumelb.lb.Pool(dict(max_backlog=5, unskilled_score=1.0))
 
 We specified a maximum per-worker backlog for the pool.  We specified
 a fairly low max backlog to make it easier to see what happens when
@@ -37,6 +37,9 @@ We didn't get a worker (we timed out), because we haven't added one.
     ...         return cmp(self.name, other.name)
     ...     def __hash__(self):
     ...         return hash(self.name)
+    ...     def handle(self, *args):
+    ...         pass
+    ...     Disconnected = None
 
     >>> w1 = Worker('w1')
     >>> pool.new_resume(w1, {})
@@ -71,8 +74,8 @@ constructed a worker class that makes testing output more useful.
 
     >>> pool
     Request classes:
-      bar: w2(1.0,1)
-      foo: w1(1.0,2)
+      bar: w2(10.0,1)
+      foo: w1(10.0,2)
     Backlogs:
       1: [w2]
       2: [w1]
@@ -90,8 +93,8 @@ and make some more foo requests:
 
     >>> pool
     Request classes:
-      bar: w2(1.0,1)
-      foo: w1(1.0,5)
+      bar: w2(10.0,1)
+      foo: w1(10.0,5)
     Backlogs:
       0: [w3]
       1: [w2]
@@ -107,8 +110,8 @@ reached it's maximum backlog, we'll start using w2:
 
     >>> pool
     Request classes:
-      bar: w2(1.0,3)
-      foo: w1(1.0,5), w2(1.0,3), w3(1.0,5)
+      bar: w2(10.0,3)
+      foo: w1(10.0,5), w2(10.0,3), w3(10.0,5)
     Backlogs:
       3: [w2]
       5: [w1, w3]
@@ -131,48 +134,60 @@ When a worker is done doing it's work, we put it back in the pool:
     >>> pool.put(w3)
     >>> pool
     Request classes:
-      bar: w2(1.0,4)
-      foo: w1(1.0,2), w2(1.0,4), w3(1.0,3)
+      bar: w2(10.0,4)
+      foo: w1(10.0,2), w2(10.0,4), w3(10.0,3)
     Backlogs:
       2: [w1]
       3: [w3]
       4: [w2]
 
-Now, when we get a worker, we'll get w3.
+Now, when we get a worker, we'll get w1.
 
     >>> pool.get('foo', 0.0)
-    w3
+    w1
 
-Why? We adjust each score by the worker's backlog and search workers
-from high score to low until the adjusted score increases. Because w2
-has a higher backlog than w3, it's adjusted score is lower so we stop
-looking.  This is for 2 reasons:
-
-1. We want to bias selection towards a smaller number of workers,
-   ideally those with the best scores,
-
-2. We want to reduce the amount of work done in each get call.
+Why? We adjust each score by the worker's backlog.
 
 Now that we've done some work, let's updaye the resumes.  This will
 normally be done by workers after periodically collecting performance
 data.
 
-    >>> pool.new_resume(w1, {'foo': 3.0})
+    >>> pool.new_resume(w1, {'foo': 30.0})
 
-    >>> pool.new_resume(w2, {'bar': 1.0, 'foo': 1.0})
+    ;>>> pool.new_resume(w2, {'bar': 10.0, 'foo': 10.0})
 
-    >>> pool.new_resume(w3, {'foo': 2.0})
+    >>> pool.new_resume(w3, {'foo': 19.0})
 
-    pool
+    >>> pool
     Request classes:
-      bar: w2(1.0,4)
-      foo: w2(1.0,4), w3(2.0,4), w1(3.0,2)
+      bar: w2(10.0,4)
+      foo: w2(10.0,4), w3(19.0,3), w1(30.0,3)
     Backlogs:
-      2: [w1]
-      4: [w2, w3]
+      3: [w1, w3]
+      4: [w2]
 
-    >>> [pool.get('foo') for i in range(5)]
-    [w1, w1, w1, w3, w2]
+    >>> pool.get('foo')
+    w1
+    >>> pool.get('foo')
+    w1
+
+    >>> pool
+    Request classes:
+      bar: w2(10.0,4)
+      foo: w2(10.0,4), w3(19.0,3), w1(30.0,5)
+    Backlogs:
+      3: [w3]
+      4: [w2]
+      5: [w1]
+
+Because w1 has reached the maximum backlog, it's out of the running.
+
+    >>> pool.get('foo')
+    w3
+    >>> pool.get('foo')
+    w3
+    >>> pool.get('foo')
+    w2
 
     >>> pool.put(w1)
     >>> pool.put(w3)
@@ -182,8 +197,8 @@ data.
     >>> pool.put(w3)
     >>> pool
     Request classes:
-      bar: w2(1.0,5)
-      foo: w2(1.0,5), w3(2.0,0), w1(3.0,4)
+      bar: w2(10.0,5)
+      foo: w2(10.0,5), w3(19.0,0), w1(30.0,4)
     Backlogs:
       0: [w3]
       4: [w1]
@@ -195,10 +210,10 @@ data.
 When a worker disconnect, it's removed from the pool:
 
     >>> pool.remove(w1)
+    >>> pool.remove(w3)
     >>> pool
     Request classes:
-      bar: w2(1.0,5)
-      foo: w2(1.0,5), w3(2.0,4)
+      bar: w2(10.0,5)
+      foo: w2(10.0,5)
     Backlogs:
-      4: [w3]
       5: [w2]

@@ -98,14 +98,18 @@ class Worker(zc.resumelb.util.Worker):
                         sumn[1] += 1
                     else:
                         byrclass[rclass] = [elapsed, 1]
-                self.resume = dict(
+                self.new_resume(dict(
                     (rclass, n/sum)
                     for (rclass, (sum, n)) in byrclass.iteritems()
-                    )
-                self.put((0, self.resume))
+                    ))
 
         except self.Disconnected:
             return # whatever
+
+    def new_resume(self, resume):
+        self.resume = resume
+        self.put((0, resume))
+
 
 def server_runner(app, global_conf, lb, history=500): # paste deploy hook
     logging.basicConfig(level=logging.INFO)

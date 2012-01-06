@@ -41,8 +41,11 @@ def _core_pipe_read_callback(event, evtype):
     except EnvironmentError:
         pass
 
-gevent.core.event(gevent.core.EV_READ|gevent.core.EV_PERSIST, \
-    _core_pipe_read, _core_pipe_read_callback).add()
+gevent.core.event(gevent.core.EV_READ|gevent.core.EV_PERSIST,
+                  _core_pipe_read, _core_pipe_read_callback).add()
+
+def wake_gevent():
+    os.write(_core_pipe_write, '\0')
 
 # MTAsyncResult is greatly simplified from version in https://bitbucket.org/
 #   denis/gevent-playground/src/49d1cdcdf643/geventutil/threadpool.py
@@ -50,11 +53,11 @@ class MTAsyncResult(gevent.event.AsyncResult):
 
     def set_exception(self, exception):
         gevent.event.AsyncResult.set_exception(self, exception)
-        os.write(_core_pipe_write, '\0')
+        wake_gevent()
 
     def set(self, value=None):
         gevent.event.AsyncResult.set(self, value)
-        os.write(_core_pipe_write, '\0')
+        wake_gevent()
 
 #
 ###############################################################################

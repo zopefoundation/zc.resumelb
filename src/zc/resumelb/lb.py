@@ -1,4 +1,4 @@
-import bisect
+from bisect import bisect_left, insort
 import gevent
 import gevent.hub
 import gevent.pywsgi
@@ -6,6 +6,7 @@ import gevent.server
 import logging
 import sys
 import webob
+import zc.mappingobject
 import zc.resumelb.util
 
 block_size = 1<<16
@@ -22,11 +23,12 @@ Please try again.
 class LB:
 
     def __init__(self, worker_addr, classifier,
-                 disconnect_message=default_disconnect_message
+                 settings=None,
+                 disconnect_message=default_disconnect_message,
                  ):
         self.classifier = classifier
         self.disconnect_message = disconnect_message
-        self.pool = Pool()
+        self.pool = Pool(settings)
         self.worker_server = gevent.server.StreamServer(
             worker_addr, self.handle_worker)
         self.worker_server.start()
@@ -62,117 +64,164 @@ class LB:
 
 class Pool:
 
-    def __init__(self, max_backlog=40):
-        self.max_backlog = max_backlog
-        self.unskilled = [set() for i in range(max_backlog+1)]
-        self.skilled = {}
-        self.resumes = {}
-        self.backlogs = {}
+    def __init__(self, settings=None):
+        if settings is None:
+            settings = dict(
+                max_backlog = 40,
+                unskilled_score = 1.0,
+                )
+        self.settings = settings
+        self.workers = set()
+        self.unskilled = [] # sorted([(uscore, poolworker)])
+        self.skilled = {}   # rclass -> {(score, workers)}
+        self.nskills = 0    # sum of resume lengths
         self.event = gevent.event.Event()
 
     def __repr__(self):
-        skilled = self.skilled
-        backlogs = self.backlogs
         outl = []
         out = outl.append
         out('Request classes:')
-        for rclass in sorted(skilled):
+        for (rclass, skilled) in sorted(self.skilled.items()):
             out('  %s: %s'
                 % (rclass,
-                   ', '.join('%s(%s,%s)' % (worker, score, backlogs[worker])
-                             for (score, worker) in skilled[rclass])
+                   ', '.join(
+                       '%s(%s,%s)' %
+                       (worker, score, worker.backlog)
+                       for (score, worker) in sorted(skilled)
                    ))
+                )
         out('Backlogs:')
-        for backlog, workers in enumerate(self.unskilled):
-            if workers:
-                out('  %s: %s' % (backlog, sorted(workers)))
+        backlogs = {}
+        for worker in self.workers:
+            backlogs.setdefault(worker.backlog, []).append(worker)
+        for backlog, workers in sorted(backlogs.items()):
+            out('  %s: %r' % (backlog, sorted(workers)))
         return '\n'.join(outl)
 
-    def new_resume(self, worker, resume):
+    def new_resume(self, worker, resume=None):
         skilled = self.skilled
-        resumes = self.resumes
-        try:
-            old = resumes[worker]
-        except KeyError:
-            self.backlogs[worker] = 0
-            self.unskilled[0].add(worker)
-            self.event.set()
+        unskilled = self.unskilled
+        if worker in self.workers:
+            if worker.backlog < self.settings['max_backlog']:
+                del unskilled[bisect_left(unskilled, (worker.uscore, worker))]
+            for rclass, score in worker.resume.iteritems():
+                skilled[rclass].remove((score, worker))
+            self.nskills -= len(worker.resume)
         else:
-            for rclass, score in old.iteritems():
-                workers = skilled[rclass]
-                del workers[bisect.bisect_left(workers, (score, worker))]
+            self.workers.add(worker)
+            worker.backlog = 0
 
-        for rclass, score in resume.iteritems():
-            bisect.insort(skilled.setdefault(rclass, []), (score, worker))
+        if resume is None:
+            self.workers.remove(worker)
+        else:
+            worker.resume = resume
+            self.nskills += len(resume)
+            if resume:
+                scores = sorted(resume.values())
+                worker.unskilled_score = max(
+                    self.settings['unskilled_score'],
+                    scores[
+                        min(
+                            max(3, len(scores)/4),
+                            len(scores)-1,
+                            )
+                        ] / 10.0
+                    )
+            else:
+                worker.unskilled_score = (
+                    self.settings['unskilled_score'] * (1.0 + self.nskills) /
+                    len(self.workers))
 
-        resumes[worker] = resume
+            uscore = (
+                worker.unskilled_score /
+                (1.0 + worker.backlog)
+                )
+            worker.uscore = uscore
+            insort(unskilled, (uscore, worker))
+            for rclass, score in resume.iteritems():
+                try:
+                    skilled[rclass].add((score, worker))
+                except KeyError:
+                    skilled[rclass] = set(((score, worker), ))
+
+
+        if self.unskilled:
+            self.event.set()
 
     def remove(self, worker):
-        self.new_resume(worker, {})
-        backlog = self.backlogs.pop(worker)
-        self.unskilled[backlog].remove(worker)
-        del self.resumes[worker]
+        self.new_resume(worker)
 
     def get(self, rclass, timeout=None):
         """Get a worker to handle a request class
         """
-        max_backlog = self.max_backlog
-        backlogs = self.backlogs
+
         unskilled = self.unskilled
-        while 1:
-
-            # Look for a skilled worker
-            best_score = 0
-            for score, worker in reversed(self.skilled.get(rclass, ())):
-                backlog = backlogs[worker] + 1
-                if backlog > max_backlog:
-                    continue
-                score /= backlog
-                if score <= best_score:
-                    break
-                best_score = score
-                best_backlog = backlog
-                best_worker = worker
-
-            if best_score:
-                unskilled[best_backlog-1].remove(best_worker)
-                unskilled[best_backlog].add(best_worker)
-                backlogs[best_worker] = best_backlog
-                return best_worker
-
-            # Look for an unskilled worker
-            for backlog, workers in enumerate(unskilled):
-                if workers:
-                    worker = workers.pop()
-                    backlog += 1
-                    try:
-                        unskilled[backlog].add(worker)
-                    except IndexError:
-                        workers.add(worker)
-                    else:
-                        backlogs[worker] = backlog
-                        resume = self.resumes[worker]
-                        if rclass not in resume:
-                            self.resumes[worker][rclass] = 1.0
-                            bisect.insort(self.skilled.setdefault(rclass, []),
-                                          (1.0, worker))
-                        return worker
-
-            # Dang. Couldn't find a worker, either because we don't
-            # have any yet, or because they're all too busy.
-            self.event.clear()
+        if not unskilled:
             self.event.wait(timeout)
-            if timeout is not None and not self.event.is_set():
+            if not self.unskilled:
                 return None
 
+        # Look for a skilled worker
+        best_score, unskilled_worker = unskilled[-1]
+        best_worker = best_backlog = None
+        max_backlog = self.settings['max_backlog']
+        skilled = self.skilled.get(rclass, ())
+        for score, worker in skilled:
+            backlog = worker.backlog + 1
+            if backlog > max_backlog:
+                continue
+            score /= backlog
+            if (score > best_score
+                or
+                (best_worker is None and worker is unskilled_worker)
+                ):
+                best_score = score
+                best_worker = worker
+                best_backlog = backlog
+
+        if best_worker is not None:
+            uscore = best_worker.uscore
+            del unskilled[bisect_left(unskilled, (uscore, best_worker))]
+        else:
+            uscore, best_worker = unskilled.pop()
+            best_backlog = best_worker.backlog + 1
+            self.nskills += 1
+            resume = best_worker.resume
+            score = max(uscore, self.settings['unskilled_score'] * 10)
+            best_worker.resume[rclass] = score
+            if skilled == ():
+                self.skilled[rclass] = set(((score, best_worker),))
+            else:
+                skilled.add((score, best_worker))
+            lresume = len(resume)
+            uscore *= lresume/(lresume + 1.0)
+
+        uscore *= best_backlog / (1.0 + best_backlog)
+        best_worker.uscore = uscore
+        best_worker.backlog = best_backlog
+        if best_backlog < max_backlog:
+            insort(unskilled, (uscore, best_worker))
+        return best_worker
+
     def put(self, worker):
-        backlogs = self.backlogs
+        backlog = worker.backlog
+        if backlog < 1:
+            return
         unskilled = self.unskilled
-        backlog = backlogs[worker]
-        unskilled[backlog].remove(worker)
+        max_backlog = self.settings['max_backlog']
+        uscore = worker.uscore
+        if backlog < max_backlog:
+            del unskilled[bisect_left(unskilled, (uscore, worker))]
+
+        uscore *= (backlog + 1.0) / backlog
+        worker.uscore = uscore
+
         backlog -= 1
-        unskilled[backlog].add(worker)
-        backlogs[worker] = backlog
+        worker.backlog = backlog
+
+        if backlog < max_backlog:
+            insort(unskilled, (uscore, worker))
+
         self.event.set()
 
 class Worker(zc.resumelb.util.Worker):
@@ -196,6 +245,9 @@ class Worker(zc.resumelb.util.Worker):
                 pool.new_resume(self, data)
             else:
                 readers[rno](data)
+
+    def __repr__(self):
+        return "worker-%s" % id(self)
 
     def handle(self, rclass, env, start_response):
         logger.debug('handled by %s', self.addr)
