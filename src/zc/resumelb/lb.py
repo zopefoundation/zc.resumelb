@@ -3,6 +3,7 @@ import gevent
 import gevent.hub
 import gevent.pywsgi
 import gevent.server
+import llist
 import logging
 import sys
 import webob
@@ -66,15 +67,11 @@ class Pool:
 
     def __init__(self, settings=None):
         if settings is None:
-            settings = dict(
-                max_backlog = 40,
-                unskilled_score = 1.0,
-                )
+            settings = {}
         self.settings = settings
         self.workers = set()
-        self.unskilled = [] # sorted([(uscore, poolworker)])
+        self.unskilled = llist.dllist()
         self.skilled = {}   # rclass -> {(score, workers)}
-        self.nskills = 0    # sum of resume lengths
         self.event = gevent.event.Event()
 
     def __repr__(self):
@@ -101,51 +98,39 @@ class Pool:
     def new_resume(self, worker, resume=None):
         skilled = self.skilled
         unskilled = self.unskilled
-        if worker in self.workers:
-            if worker.backlog < self.settings['max_backlog']:
-                del unskilled[bisect_left(unskilled, (worker.uscore, worker))]
+        workers = self.workers
+
+        target_skills_per_worker = 1 + (
+            self.settings.get('redundancy', 1) * len(skilled) /
+            (len(workers) or 1))
+
+        if worker in workers:
             for rclass, score in worker.resume.iteritems():
                 skilled[rclass].remove((score, worker))
-            self.nskills -= len(worker.resume)
+            if resume is None:
+                workers.remove(worker)
+                if worker.lnode is not None:
+                    unskilled.remove(worker.lnode)
+                    worker.lnode = None
+                return
         else:
-            self.workers.add(worker)
             worker.backlog = 0
+            workers.add(worker)
+            worker.lnode = unskilled.appendleft(worker)
 
-        if resume is None:
-            self.workers.remove(worker)
-        else:
-            worker.resume = resume
-            self.nskills += len(resume)
-            if resume:
-                scores = sorted(resume.values())
-                worker.unskilled_score = max(
-                    self.settings['unskilled_score'],
-                    scores[
-                        min(
-                            max(3, len(scores)/4),
-                            len(scores)-1,
-                            )
-                        ] / 10.0
-                    )
-            else:
-                worker.unskilled_score = (
-                    self.settings['unskilled_score'] * (1.0 + self.nskills) /
-                    len(self.workers))
+        resumeitems = resume.items()
+        drop = (len(resume) - target_skills_per_worker) / 2
+        if drop > 0:
+            resumeitems = sorted(resumeitems, key=lambda i: i[1])[drop:]
 
-            uscore = (
-                worker.unskilled_score /
-                (1.0 + worker.backlog)
-                )
-            worker.uscore = uscore
-            insort(unskilled, (uscore, worker))
-            for rclass, score in resume.iteritems():
-                try:
-                    skilled[rclass].add((score, worker))
-                except KeyError:
-                    skilled[rclass] = set(((score, worker), ))
+        worker.resume = dict(resumeitems)
+        for rclass, score in resumeitems:
+            try:
+                skilled[rclass].add((score, worker))
+            except KeyError:
+                skilled[rclass] = set(((score, worker), ))
 
-
-        if self.unskilled:
+        if unskilled:
             self.event.set()
 
     def remove(self, worker):
@@ -154,75 +139,90 @@ class Pool:
     def get(self, rclass, timeout=None):
         """Get a worker to handle a request class
         """
-
         unskilled = self.unskilled
         if not unskilled:
             self.event.wait(timeout)
-            if not self.unskilled:
+            if not unskilled:
                 return None
 
         # Look for a skilled worker
-        best_score, unskilled_worker = unskilled[-1]
-        best_worker = best_backlog = None
-        max_backlog = self.settings['max_backlog']
-        skilled = self.skilled.get(rclass, ())
+        max_backlog = self.settings.get('max_backlog', 40)
+        min_score = self.settings.get('min_score', 1.0)
+        best_score = 0
+        best_worker = None
+        skilled = self.skilled.get(rclass)
+        if skilled is None:
+            skilled = self.skilled[rclass] = set()
         for score, worker in skilled:
             backlog = worker.backlog + 1
-            if backlog > max_backlog:
-                continue
+            if backlog > 2:
+                if (
+                    # Don't let a worker get too backed up
+                    backlog > max_backlog or
+
+                    # We use min score as a way of allowing other workers
+                    # a chance to pick up work even if the skilled workers
+                    # haven't reached their backlog.  This is mainly a tuning
+                    # tool for when a worker is doing OK, but maybe still
+                    # doing too much.
+                    (score < min_score and
+                     unskilled and unskilled.first.value.backlog == 0
+                     )
+                    ):
+                    continue
             score /= backlog
-            if (score > best_score
-                or
-                (best_worker is None and worker is unskilled_worker)
-                ):
+            if (score > best_score):
                 best_score = score
                 best_worker = worker
-                best_backlog = backlog
 
-        if best_worker is not None:
-            uscore = best_worker.uscore
-            del unskilled[bisect_left(unskilled, (uscore, best_worker))]
-        else:
-            uscore, best_worker = unskilled.pop()
-            best_backlog = best_worker.backlog + 1
-            self.nskills += 1
-            resume = best_worker.resume
-            score = max(uscore, self.settings['unskilled_score'] * 10)
-            best_worker.resume[rclass] = score
-            if skilled == ():
-                self.skilled[rclass] = set(((score, best_worker),))
-            else:
+        if not best_score:
+            while unskilled.first.value.backlog >= max_backlog:
+                # Edge case.  max_backlog was reduced after a worker
+                # with a larger backlog was added.
+                #import pdb; pdb.set_trace()
+                unskilled.first.value.lnode = None
+                unskilled.popleft()
+                if not unskilled:
+                    # OK, now we need to wait. Just start over.
+                    return self.get(rclass, timeout)
+
+            best_worker = unskilled.first.value
+            if rclass not in best_worker.resume:
+
+                # We now have an unskilled worker and we need to
+                # assign it a score.
+                # - It has to be >= min score, or it won't get future work.
+                # - We want to give it work somewhat gradually.
+                # - We got here because:
+                #   - there are no skilled workers,
+                #   - The skilled workers have all either:
+                #     - Eached their max backlog, or
+                #     - Have scores > min score
+                # Let's set it to min score because either:
+                # - There are no skilled workers, so they'll all get the same
+                # - Other workers are maxed out, or
+                # - The score will be higher than some the existing, so it'll
+                #   get work
+                # We also allow for an unskilled_score setting to override.
+                score = self.settings.get('unskilled_score', min_score)
+                best_worker.resume[rclass] = score
                 skilled.add((score, best_worker))
-            lresume = len(resume)
-            uscore *= lresume/(lresume + 1.0)
 
-        uscore *= best_backlog / (1.0 + best_backlog)
-        best_worker.uscore = uscore
-        best_worker.backlog = best_backlog
-        if best_backlog < max_backlog:
-            insort(unskilled, (uscore, best_worker))
+        unskilled.remove(best_worker.lnode)
+        best_worker.backlog += 1
+        if best_worker.backlog < max_backlog:
+            best_worker.lnode = unskilled.append(best_worker)
+        else:
+            best_worker.lnode = None
+
         return best_worker
 
     def put(self, worker):
-        backlog = worker.backlog
-        if backlog < 1:
-            return
-        unskilled = self.unskilled
-        max_backlog = self.settings['max_backlog']
-        uscore = worker.uscore
-        if backlog < max_backlog:
-            del unskilled[bisect_left(unskilled, (uscore, worker))]
-
-        uscore *= (backlog + 1.0) / backlog
-        worker.uscore = uscore
-
-        backlog -= 1
-        worker.backlog = backlog
-
-        if backlog < max_backlog:
-            insort(unskilled, (uscore, worker))
-
-        self.event.set()
+        if worker.lnode is None:
+            worker.lnode = self.unskilled.append(worker)
+            self.event.set()
+        if worker.backlog:
+            worker.backlog -= 1
 
 class Worker(zc.resumelb.util.Worker):
 
