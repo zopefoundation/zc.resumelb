@@ -38,6 +38,7 @@ The whole thing is controlled from a zookeeper node with properties:
 - sim_workers number of workers
 
 """
+from pprint import pprint
 import json
 import logging
 import os
@@ -99,8 +100,6 @@ class App:
                 self.cache.size(self.cache_size)
 
     def __call__(self, environ, start_response):
-        """Simplest possible application object"""
-
         n = nhit = nmiss = nevict = 0
         for oid in environ['PATH_INFO'].rsplit('/', 1)[1].split('_'):
             n += 1
@@ -144,6 +143,8 @@ def worker(path):
         class Worker(zc.resumelb.worker.Worker):
 
             def new_resume(self, resume):
+                print '\nNEW RESUME:', len(resume), os.getpid(), time.ctime()
+                pprint(resume)
                 stats = dict(hitrate=str(app.hitrates))
                 stats.update(resume)
                 zk.set(worker_path, json.dumps(stats))
@@ -165,6 +166,17 @@ def clients(path):
 
     properties = zk.properties(path)
     settings = zc.mappingobject.mappingobject(properties)
+
+    siteids = []
+
+    @properties
+    def _(*a):
+        n = settings.sim_sites
+        siteids[:] = [0]
+        for i in range(4):
+            if n:
+                siteids.extend(range(n))
+            n /= 2
 
     logging.basicConfig()
 
@@ -189,7 +201,7 @@ def clients(path):
     import gevent.socket
 
     def do_request():
-        siteid = random.randint(0, settings.sim_sites)
+        siteid = random.choice(siteids)
         oids = set(
             int(random.gauss(0, settings.sim_objects_per_site/4))
             for i in range(settings.sim_objects_per_request)
@@ -292,9 +304,11 @@ class LBLogger:
             pool = self.lb.pool
             self.then = time.time()
             print
+            print time.ctime()
             print 'requests', self.requests.n-self.nr, self.requests
             self.nr = self.requests.n
-            print pool.unskilled
+
+            # print pool
             print 'backlogs', str(Sample(data=[
                 worker.backlog for worker in pool.workers]))
             print 'resumes', str(Sample(data=[
@@ -308,31 +322,13 @@ class LBLogger:
                     ):
                     print 'bad skilled', sorted(skilled, key=lambda i: i[1])
 
-
-
-
-
-
-
-            # print 'backlogs', str(Sample(data=self.lb.pool.backlogs.values()))
-            # print 'resumes', str(Sample(
-            #     data=map(len, self.lb.pool.resumes.values())))
-            # print 'skilled', str(Sample(
-            #         data=map(len, self.lb.pool.skilled.values())))
-            # self.zk.set(self.path, json.dumps(dict(
-            #     requests = str(self.requests),
-            #     backlogs = str(Sample(data=self.lb.pool.backlogs.values())),
-            #     resumes = str(Sample(
-            #         data=map(len, self.lb.pool.resumes.values()))),
-            #     skilled = str(Sample(
-            #         data=map(len, self.lb.pool.skilled.values()))),
-            #     )))
-
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
     [path] = args
     logging.basicConfig()
+
+    random.seed(0)
 
     @zc.thread.Process(args=(path,))
     def lb(path):
