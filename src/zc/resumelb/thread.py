@@ -87,6 +87,10 @@ class Pool:
         self.queue.put((result, job, args))
         return result
 
+    def apply(self, job, *args):
+        result = self.result(job, *args)
+        return result.get()
+
     def close(self, timeout=1):
         for thread in self.threads:
             self.queue.put((None, None, None))
