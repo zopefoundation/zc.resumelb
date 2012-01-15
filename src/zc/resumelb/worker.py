@@ -9,6 +9,7 @@ import sys
 import time
 import zc.mappingobject
 import zc.resumelb.util
+import zc.resumelb.thread
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,13 @@ class Worker(zc.resumelb.util.Worker):
         self.resume = {}
         self.time_ring = []
         self.time_ring_pos = 0
+
+        if settings.get('threads'):
+            pool = zc.resumelb.thread.Pool(self.settings.threads)
+            self.apply = pool.apply
+        else:
+            self.apply = lambda f, *a: f(*a)
+
         while 1:
             try:
                 self.connect(addr)
@@ -73,7 +81,7 @@ class Worker(zc.resumelb.util.Worker):
             self.put((rno, (status, headers)))
 
         try:
-            for data in self.app(env, start_response):
+            for data in self.apply(self.app, env, start_response):
                 self.put((rno, data))
 
             self.put((rno, ''))
