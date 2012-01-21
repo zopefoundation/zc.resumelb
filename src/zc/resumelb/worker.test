@@ -1,42 +1,34 @@
-Workers act as wsgi servers, but rather than listenting for HTTP
-requests, they connect to a resumelb to request work.
+Basic, single-connection tests
+==============================
 
-To test the worker, we'll start a testing lb that let's us control
-data going to and from the worker.
+Workers act as wsgi servers, accepting requests and sending responses
+using serialized wsgi (not web requests).
 
-    >>> import gevent.server, gevent.event
-    >>> worker_socket_result = gevent.event.AsyncResult()
-    >>> def handle(sock, addr):
-    ...     worker_socket_result.set(sock)
-
-    >>> server = gevent.server.StreamServer(('127.0.0.1', 0), handle)
-    >>> server.start()
-    >>> server_port = server.server_port
-
-Now, we can start a worker:
+Now, let's create a worker:
 
     >>> import zc.resumelb.worker, zc.resumelb.tests
-    >>> worker = gevent.spawn(
-    ...   zc.resumelb.worker.Worker,
-    ...   zc.resumelb.tests.app(),
-    ...   ('127.0.0.1', server_port),
-    ...   dict(history=5))
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=5))
 
 Here we created a worker using a test application, telling it to
-connect to our server address and to update it's resume after every
+an address to listen on and to update it's resume after every
 five requests.
 
-Now, wait for the worker to connect:
+Note that we passed 0 as the address port. This causes an ephemeral
+port to be used. We can get the actual address using ``worker.addr``.
 
-    >>> worker_socket = worker_socket_result.get()
+Now, we'll connect to the worker:
+
+    >>> import gevent.socket
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
 
 Workers and the lb communicate via sized messages.
 
 Each message consists of binary request numbers, data size and a
 marshalled data string.  Helper functions help us read and write
-messages.  When workers connect, they send their resume and then wait
-for work to do.  Because our worker has no experience :), it's resume
-is empty:
+messages.  When workers accept a connection, they send their resume
+and then wait for work to do.  Because our worker has no experience
+:), it's resume is empty:
 
     >>> from zc.resumelb.util import read_message, write_message
     >>> read_message(worker_socket)
@@ -54,9 +46,9 @@ environments. We'll use webob to help us set this up.
     ...     inp = env.pop('wsgi.input')
     ...     del env['wsgi.errors']
     ...     env['zc.resumelb.request_class'] = rclass
-    ...     return env, inp
+    ...     return env
 
-    >>> env, _ = newenv('', '/hi.html')
+    >>> env = newenv('', '/hi.html')
 
 The newenv helper:
 
@@ -78,7 +70,12 @@ The worker will process the request and send back 3 records:
 - an empty end-of-body message.
 
     >>> def print_response(worker_socket, rno, size_only=False):
-    ...     rn, (status, headers) = read_message(worker_socket)
+    ...     d = read_message(worker_socket)
+    ...     try: rn, (status, headers) = d
+    ...     except:
+    ...       print 'wtf', `d`
+    ...       return
+    ...     #rn, (status, headers) = read_message(worker_socket)
     ...     if rn != rno:
     ...        raise AssertionError("Bad request numbers", rno, rn)
     ...     print rno, status
@@ -112,12 +109,9 @@ The worker will process the request and send back 3 records:
 
 We can have multiple outstanding requests:
 
-    >>> env, _ = newenv('', '/hi.html')
-    >>> write_message(worker_socket, 2, env)
-    >>> env, inp = newenv('1', '/hi.html')
-    >>> write_message(worker_socket, 3, env)
-    >>> env, inp = newenv('1', '/hi.html')
-    >>> write_message(worker_socket, 4, env)
+    >>> write_message(worker_socket, 2, newenv('', '/hi.html'))
+    >>> write_message(worker_socket, 3, newenv('1', '/hi.html'))
+    >>> write_message(worker_socket, 4, newenv('1', '/hi.html'))
 
 At this point, we have 3 outstading requests.  Let's create 3 bodies:
 
@@ -189,8 +183,7 @@ We told the worker to use a history of length 5.  This means that it
 will keep track of times for the last 5 requests and compute a new
 resume after 5 requests.  Let's test that by making a 5th request.
 
-    >>> env, _ = newenv('2', '/sleep.html?dur=.11')
-    >>> write_message(worker_socket, 5, env, '')
+    >>> write_message(worker_socket, 5, newenv('2', '/sleep.html?dur=.11'), '')
     >>> print_response(worker_socket, 5)
     5 200 OK
     Content-Length: 12
@@ -212,11 +205,10 @@ last request, we sleep .11 seconds to assure that it's resume entry
 would be less than 10.
 
 We can reuse request numbers. We normally don't reuse request numbers
-until we get to 4 billion or so., But lots make sure we can reuse
+until we get to 4 billion or so., But lets make sure we can reuse
 them:
 
-    >>> env, _ = newenv('', '/gen.html?size=100')
-    >>> write_message(worker_socket, 1, env, '')
+    >>> write_message(worker_socket, 1, newenv('', '/gen.html?size=100'), '')
 
 In this example, we've also requested a very large output.
 
@@ -227,35 +219,141 @@ In this example, we've also requested a very large output.
     <BLANKLINE>
     1200000
 
-Reconnection
-============
+Multiple connections (multiple load balancers)
+==============================================
 
-If a worker is disconnected, it will automatically reconnect:
+In a production deployment, there will likely be multiple load
+balancers for redundancy.  In this case, there are multiple
+connections to workers.  Let's excercise that and make sure it works
+properly.
 
-    >>> worker_socket_result = gevent.event.AsyncResult()
-    >>> worker_socket.close()
-    >>> worker_socket = worker_socket_result.get()
+Open a second connection:
 
-and send it's resume:
+    >>> worker_socket2 = gevent.socket.create_connection(worker.addr)
+
+We're immediately send the worker's resume -- same as the old.
+
+    >>> read_message(worker_socket2) == (zero, resume)
+    True
+
+And send simultaneous requests to each connection:
+
+    >>> write_message(worker_socket,  2, newenv('1', '/hi.html'))
+    >>> write_message(worker_socket2, 2, newenv('2', '/hi.html'))
+    >>> write_message(worker_socket,  3, newenv('1', '/hi.html'))
+    >>> write_message(worker_socket2, 3, newenv('2', '/hi.html'))
+    >>> write_message(worker_socket,  4, newenv('1', '/hi.html'))
+    >>> write_message(worker_socket2, 4, newenv('2', '/hi.html'))
+
+And pretty much repeat the multi-connection test we did for one worker:
+
+    >>> b22 = 'i'*1000
+    >>> b32 = 'j'*10000
+    >>> b42 = 'k'*100000
+
+    >>> sha1(b22)
+    'bbf78f200f29636bb75c85467c1319e57a0d4149'
+    >>> sha1(b32)
+    '44bd0dbf8208fea52dc6180376d14798b86847bd'
+    >>> sha1(b42)
+    'd10948c2d88f13ea561a09157dd263c38527b2b6'
+
+
+    >>> write_message(worker_socket, 2, b2)
+    >>> write_message(worker_socket2, 2, b22)
+    >>> write_message(worker_socket, 3, b3[:5000])
+    >>> write_message(worker_socket2, 3, b32[:5000])
+    >>> write_message(worker_socket, 4, b4[:5000])
+    >>> write_message(worker_socket2, 4, b42[:5000])
+    >>> write_message(worker_socket, 4, b4[5000:10000])
+    >>> write_message(worker_socket2, 4, b42[5000:10000])
+    >>> write_message(worker_socket, 3, b3[5000:10000])
+    >>> write_message(worker_socket2, 3, b32[5000:10000])
+    >>> for i in range(1, 10):
+    ...     write_message(worker_socket, 4, b4[i*10000:(i+1)*10000])
+    ...     write_message(worker_socket2, 4, b42[i*10000:(i+1)*10000])
+
+    >>> write_message(worker_socket, 4, '')
+    >>> print_response(worker_socket, 4) # doctest: +NORMALIZE_WHITESPACE
+    4 200 OK
+    Content-Length: 84
+    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    http://localhost/hi.html ->
+    6115 100000 3235771c66bf77697df635e1bce4173668d2ea32
+    <BLANKLINE>
+
+And on with our simultaneous request on multiple worker test.
+
+    >>> write_message(worker_socket2, 4, '')
+    >>> print_response(worker_socket2, 4) # doctest: +NORMALIZE_WHITESPACE
+    4 200 OK
+    Content-Length: 84
+    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    http://localhost/hi.html ->
+    6115 100000 d10948c2d88f13ea561a09157dd263c38527b2b6
+    <BLANKLINE>
+
+    >>> write_message(worker_socket, 2, '')
+    >>> print_response(worker_socket, 2) # doctest: +NORMALIZE_WHITESPACE
+    2 200 OK
+    Content-Length: 82
+    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    http://localhost/hi.html ->
+    6115 1000 c3efa690fa3fdd2e2526853eed670538ea127638
+    <BLANKLINE>
+
+    >>> write_message(worker_socket2, 2, '')
+    >>> print_response(worker_socket2, 2) # doctest: +NORMALIZE_WHITESPACE
+    2 200 OK
+    Content-Length: 82
+    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    http://localhost/hi.html ->
+    6115 1000 bbf78f200f29636bb75c85467c1319e57a0d4149
+    <BLANKLINE>
+
+
+We're due for another resume.  We should get it on both sockets!
 
     >>> zero, resume = read_message(worker_socket)
     >>> zero, resume.keys(), [x for x in resume.values() if type(x) != float]
     (0, ['', '1', '2'], [])
-    >>> resume[''] > 10, resume['1'] > 10, resume['2'] < 10
-    (True, True, True)
 
-We can even stop the server for a while, and the worker will
-reconnect:
+    >>> read_message(worker_socket2) == (zero, resume)
+    True
 
-    >>> server.stop()
-    >>> worker_socket.close()
-    >>> gevent.sleep(3)
-    >>> worker_socket_result = gevent.event.AsyncResult()
-    >>> server = gevent.server.StreamServer(('127.0.0.1', server_port), handle)
-    >>> server.start()
-    >>> worker_socket = worker_socket_result.get()
-    >>> zero, resume = read_message(worker_socket)
-    >>> zero, resume.keys(), [x for x in resume.values() if type(x) != float]
-    (0, ['', '1', '2'], [])
-    >>> resume[''] > 10, resume['1'] > 10, resume['2'] < 10
-    (True, True, True)
+
+    >>> write_message(worker_socket, 3, '')
+    >>> print_response(worker_socket, 3) # doctest: +NORMALIZE_WHITESPACE
+    3 200 OK
+    Content-Length: 83
+    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    http://localhost/hi.html ->
+    6115 10000 c1d5e830a1027a7b5de9e0620f3a2497d6b60c3e
+    <BLANKLINE>
+
+    >>> write_message(worker_socket2, 3, '')
+    >>> print_response(worker_socket2, 3) # doctest: +NORMALIZE_WHITESPACE
+    3 200 OK
+    Content-Length: 83
+    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    <BLANKLINE>
+    <BLANKLINE>
+    <BLANKLINE>
+    http://localhost/hi.html ->
+    6115 10000 44bd0dbf8208fea52dc6180376d14798b86847bd
+    <BLANKLINE>

@@ -46,9 +46,20 @@ def sleep(dur=0):
 def app():
     return bobo.Application(bobo_resources=__name__)
 
+def wait_until(func=None, timeout=9):
+    if func is None:
+        return lambda f: wait_until(f, timeout)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if func():
+            return
+        gevent.sleep(.01)
+    raise ValueError('timeout')
+
 def setUp(test):
     global pid
     pid = 6115
+    test.globs['wait_until'] = wait_until
 
 def test_suite():
     return unittest.TestSuite((

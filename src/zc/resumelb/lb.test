@@ -1,24 +1,48 @@
 Basic LB tests
 ==============
 
-The LB algorithm us tested in pool.test.  This file aims to test the
+The LB algorithm is tested in pool.test.  This file aims to test the
 networking aspects of the LB.
 
-We'll start by creating a load balencer:
+An lb takes a set of worker addresses, which it connects to.  It
+listens on an address for incoming web requests.  You can updare it's
+set of worker addresses at any time.
+
+To test lb behavior, we'll create faux workers the lb can connect to.
+
+    >>> import gevent.server
+    >>> class Worker:
+    ...     def __init__(self):
+    ...         server = gevent.server.StreamServer(
+    ...             ('127.0.0.1', 0), self.handle)
+    ...         server.start()
+    ...         self.addr = '127.0.0.1', server.server_port
+    ...     def handle(self, socket, addr):
+    ...         self.socket = socket
+
+
+    >>> workers = [Worker() for i in range(2)]
+
+We have some workers running. Now, let's create a load balancer:
 
     >>> import zc.resumelb.lb
-    >>> lb = zc.resumelb.lb.LB(('127.0.0.1', 0), zc.resumelb.lb.host_classifier)
+    >>> lb = zc.resumelb.lb.LB([w.addr for w in workers],
+    ...                        zc.resumelb.lb.host_classifier)
 
-Now, we'll create a couple of sockets representing workers:
+We pass the constructor an iterable of addresses.  The lb will connect
+to these addresses. Let's wait for it to do so:
 
-    >>> import gevent.socket
+    >>> wait_until(
+    ...     lambda :
+    ...     len([w for w in workers if hasattr(w, 'socket')]) == len(workers)
+    ...     )
+
+When the workers get connections, they send the lb their resumes:
+
+    >>> worker1, worker2 = [w.socket for w in workers]
     >>> from zc.resumelb.util import read_message, write_message
-    >>> worker1 = gevent.socket.create_connection(
-    ...    ('127.0.0.1', lb.worker_server.server_port))
-    >>> write_message(worker1, 0, {'h1.com': 10.0})
 
-    >>> worker2 = gevent.socket.create_connection(
-    ...    ('127.0.0.1', lb.worker_server.server_port))
+    >>> write_message(worker1, 0, {'h1.com': 10.0})
     >>> write_message(worker2, 0, {'h2.com': 10.0})
 
 Now, let's make a request and make sure the data gets where it's
@@ -251,3 +275,24 @@ The GET and HEAD request will be send to worker2:
     Please try again.
     </body></html>
 
+Automatic reconnection
+======================
+
+Meanwhile, since worker1 disconnected, the load balancer reconnected
+to the same address. We can see this because the first worker (server)
+has a new socket:
+
+    >>> workers[0].socket != worker1
+    True
+
+It's not in the lb pool yet, because we haven't sent it's resume yet:
+
+    >>> len(lb.pool.workers)
+    1
+
+But if we send a resume, it will be:
+
+    >>> write_message(workers[0].socket, 0, {})
+    >>> gevent.sleep(.01)
+    >>> len(lb.pool.workers)
+    2

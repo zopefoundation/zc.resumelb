@@ -2,9 +2,8 @@ import cStringIO
 import errno
 import gevent
 import gevent.hub
-import gevent.socket
+import gevent.server
 import logging
-import socket
 import sys
 import time
 import zc.mappingobject
@@ -13,14 +12,24 @@ import zc.resumelb.thread
 
 logger = logging.getLogger(__name__)
 
-class Worker(zc.resumelb.util.Worker):
+def error(mess):
+    logger.exception(mess)
+
+import traceback
+def error(mess):
+    print >>sys.stderr, mess
+    traceback.print_exc()
+
+class Worker:
 
     def __init__(self, app, addr, settings):
         self.app = app
         self.settings = zc.mappingobject.mappingobject(settings)
+        self.worker_request_number = 0
         self.resume = {}
         self.time_ring = []
         self.time_ring_pos = 0
+        self.connections = set()
 
         if settings.get('threads'):
             pool = zc.resumelb.thread.Pool(self.settings.threads)
@@ -28,95 +37,104 @@ class Worker(zc.resumelb.util.Worker):
         else:
             self.apply = lambda f, *a: f(*a)
 
-        while 1:
-            try:
-                self.connect(addr)
-            except socket.error, err:
-                if err.args[0] == errno.ECONNREFUSED:
-                    gevent.sleep(1)
-                else:
-                    raise
+        self.server = gevent.server.StreamServer(addr, self.handle_connection)
+        self.server.start()
+        self.addr = addr[0], self.server.server_port
 
-    def connect(self, addr):
-        socket = gevent.socket.create_connection(addr)
-        readers = self.connected(socket)
-        self.put((0, self.resume))
-
-        while self.is_connected:
-            try:
-                rno, data = zc.resumelb.util.read_message(socket)
-            except gevent.GreenletExit:
-                self.disconnected()
-                return
-
-            rput = readers.get(rno)
-            if rput is None:
-                env = data
-                env['zc.resumelb.time'] = time.time()
-                env['zc.resumelb.lb_addr'] = self.addr
-                gevent.spawn(self.handle, rno, self.start(rno), env)
-            else:
-                rput(data)
-
-    def handle(self, rno, get, env):
-        f = cStringIO.StringIO()
-        env['wsgi.input'] = f
-        env['wsgi.errors'] = sys.stderr
-
-        # XXX We're buffering input.  It maybe should to have option not to.
-        while 1:
-            data = get()
-            if data:
-                f.write(data)
-            elif data is None:
-                # Request cancelled (or worker disconnected)
-                self.end(rno)
-                return
-            else:
-                break
-        f.seek(0)
-
-        def start_response(status, headers, exc_info=None):
-            assert not exc_info # XXX
-            self.put((rno, (status, headers)))
-
+    def handle_connection(self, sock, addr):
         try:
-            for data in self.apply(self.app, env, start_response):
-                self.put((rno, data))
+            conn = zc.resumelb.util.Worker()
+            self.connections.add(conn)
+            readers = conn.connected(sock, addr)
+            conn.put((0, self.resume))
+            while conn.is_connected:
+                try:
+                    rno, data = zc.resumelb.util.read_message(sock)
+                except gevent.GreenletExit:
+                    conn.disconnected()
+                    self.connections.remove(conn)
+                    return
 
-            self.put((rno, ''))
-            self.readers.pop(rno)
+                rput = readers.get(rno)
+                if rput is None:
+                    env = data
+                    env['zc.resumelb.time'] = time.time()
+                    env['zc.resumelb.lb_addr'] = addr
+                    gevent.spawn(self.handle, conn, rno, conn.start(rno), env)
+                else:
+                    rput(data)
+        except:
+            error('handle_connection')
 
-            elapsed = max(time.time() - env['zc.resumelb.time'], 1e-9)
-            time_ring = self.time_ring
-            time_ring_pos = rno % self.settings.history
-            rclass = env['zc.resumelb.request_class']
+    def handle(self, conn, rno, get, env):
+        try:
+            f = cStringIO.StringIO()
+            env['wsgi.input'] = f
+            env['wsgi.errors'] = sys.stderr
+
+            # XXX We're buffering input.  It maybe should to have option not to.
+            while 1:
+                data = get()
+                if data:
+                    f.write(data)
+                elif data is None:
+                    # Request cancelled (or worker disconnected)
+                    return
+                else:
+                    break
+            f.seek(0)
+
+            def start_response(status, headers, exc_info=None):
+                assert not exc_info # XXX
+                conn.put((rno, (status, headers)))
+
             try:
-                time_ring[time_ring_pos] = rclass, elapsed
-            except IndexError:
-                while len(time_ring) <= time_ring_pos:
-                    time_ring.append((rclass, elapsed))
+                for data in self.apply(self.app, env, start_response):
+                    conn.put((rno, data))
 
-            if rno % self.settings.history == 0:
-                byrclass = {}
-                for rclass, elapsed in time_ring:
-                    sumn = byrclass.get(rclass)
-                    if sumn:
-                        sumn[0] += elapsed
-                        sumn[1] += 1
-                    else:
-                        byrclass[rclass] = [elapsed, 1]
-                self.new_resume(dict(
-                    (rclass, n/sum)
-                    for (rclass, (sum, n)) in byrclass.iteritems()
-                    ))
+                conn.put((rno, ''))
 
-        except self.Disconnected:
-            return # whatever
+                elapsed = max(time.time() - env['zc.resumelb.time'], 1e-9)
+                time_ring = self.time_ring
+                time_ring_pos = rno % self.settings.history
+                rclass = env['zc.resumelb.request_class']
+                try:
+                    time_ring[time_ring_pos] = rclass, elapsed
+                except IndexError:
+                    while len(time_ring) <= time_ring_pos:
+                        time_ring.append((rclass, elapsed))
+
+                worker_request_number = self.worker_request_number + 1
+                self.worker_request_number = worker_request_number
+                if worker_request_number % self.settings.history == 0:
+                    byrclass = {}
+                    for rclass, elapsed in time_ring:
+                        sumn = byrclass.get(rclass)
+                        if sumn:
+                            sumn[0] += elapsed
+                            sumn[1] += 1
+                        else:
+                            byrclass[rclass] = [elapsed, 1]
+                    self.new_resume(dict(
+                        (rclass, n/sum)
+                        for (rclass, (sum, n)) in byrclass.iteritems()
+                        ))
+
+            except conn.Disconnected:
+                return # whatever
+        except:
+            error('handle_connection')
+        finally:
+            conn.end(rno)
 
     def new_resume(self, resume):
         self.resume = resume
-        self.put((0, resume))
+        for conn in self.connections:
+            if conn.is_connected:
+                try:
+                    conn.put((0, resume))
+                except conn.Disconnected:
+                    pass
 
 
 def server_runner(app, global_conf, lb, history=500): # paste deploy hook

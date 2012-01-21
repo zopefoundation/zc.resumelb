@@ -2,7 +2,7 @@ from bisect import bisect_left, insort
 import gevent
 import gevent.hub
 import gevent.pywsgi
-import gevent.server
+import gevent.socket
 import llist
 import logging
 import sys
@@ -23,20 +23,23 @@ Please try again.
 
 class LB:
 
-    def __init__(self, worker_addr, classifier,
+    def __init__(self, worker_addrs, classifier,
                  settings=None,
                  disconnect_message=default_disconnect_message,
                  ):
         self.classifier = classifier
         self.disconnect_message = disconnect_message
         self.pool = Pool(settings)
-        self.worker_server = gevent.server.StreamServer(
-            worker_addr, self.handle_worker)
-        self.worker_server.start()
 
-    def handle_worker(self, socket, addr):
-        logger.info('new worker')
-        Worker(self.pool, socket, addr)
+        self.workletts = dict(
+            (addr, gevent.spawn(self.connect, addr))
+            for addr in worker_addrs
+            )
+
+    def connect(self, addr):
+        while 1:
+            socket = gevent.socket.create_connection(addr)
+            Worker(self.pool, socket, addr)
 
     def handle_wsgi(self, env, start_response):
         rclass = self.classifier(env)
