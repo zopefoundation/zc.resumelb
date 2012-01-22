@@ -13,7 +13,7 @@ To test lb behavior, we'll create faux workers the lb can connect to.
     >>> import gevent.server
     >>> class Worker:
     ...     def __init__(self):
-    ...         server = gevent.server.StreamServer(
+    ...         self.server = server = gevent.server.StreamServer(
     ...             ('127.0.0.1', 0), self.handle)
     ...         server.start()
     ...         self.addr = '127.0.0.1', server.server_port
@@ -297,6 +297,39 @@ But if we send a resume, it will be:
     >>> len(lb.pool.workers)
     2
 
+In the test above, the worker was still listening the whole time.
+Let's Go a bit further.  We'll shut down the worker's server as well
+as the worker socket. When the lb gets an error, it sleaps a a second
+after failed attempts.  We can change this by setting a class variable
+that exists primarily for testing.  We'll change it on the lb.
+
+    >>> lb.connect_sleep = 0.01
+    >>> port = workers[0].server.server_port # We'll reuse below
+    >>> workers[0].server.kill()
+    >>> socket = workers[0].socket
+    >>> socket.close()
+    >>> gevent.sleep(.01)
+    >>> len(lb.pool.workers)
+    1
+
+OK, so we lost the worker and the lb didn't reconnect because the
+worker server is down:
+
+    >>> workers[0].socket is socket
+    True
+
+Now, we'll recreate the worker server and after a bit, the lb should reconnect:
+
+    >>> workers[0].server = gevent.server.StreamServer(
+    ...     ('127.0.0.1', port), workers[0].handle)
+    >>> workers[0].server.start()
+    >>> wait_until(lambda : workers[0].socket is not socket)
+    >>> write_message(workers[0].socket, 0, {'h3.com': 10.0})
+    >>> gevent.sleep(.01)
+    >>> len(lb.pool.workers)
+    2
+
+
 Adding and removing workers
 ===========================
 
@@ -346,3 +379,4 @@ before that we closed:
 
 Typically, by the time we remove an address, the worker will already
 have gone away.
+

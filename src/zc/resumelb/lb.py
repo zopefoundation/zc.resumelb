@@ -45,10 +45,15 @@ class LB:
             if addr not in addrs:
                 workletts.pop(addr)
 
+    connect_sleep = 1.0
     def connect(self, addr, workletts):
         while addr in workletts:
-            socket = gevent.socket.create_connection(addr)
-            Worker(self.pool, socket, addr)
+            try:
+                socket = gevent.socket.create_connection(addr)
+                Worker(self.pool, socket, addr)
+            except Exception:
+                logger.exception('lb connecting to %r', addr)
+                gevent.sleep(self.connect_sleep)
 
     def handle_wsgi(self, env, start_response):
         rclass = self.classifier(env)
@@ -322,9 +327,10 @@ def main(args=None):
         args = sys.argv[1:]
 
     logging.basicConfig(level=logging.INFO)
-    wsgi_addr, lb_addr = map(parse_addr, args)
+    addrs = map(parse_addr, args)
+    wsgi_addr = addrs.pop(0)
 
-    lb = LB(lb_addr, host_classifier)
+    lb = LB(addrs, host_classifier)
     gevent.pywsgi.WSGIServer(wsgi_addr, lb.handle_wsgi).serve_forever()
 
 
