@@ -10,13 +10,16 @@ logger = logging.getLogger(__name__)
 disconnected_errors = (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN,
                  errno.ESHUTDOWN, errno.ECONNABORTED)
 
+class Disconnected(Exception):
+    pass
+
 def read_message(sock):
     data = ''
     while len(data) < 8:
         recieved = sock.recv(8-len(data))
         if not recieved:
             logger.info("read_message disconnected %s", sock)
-            raise gevent.GreenletExit()
+            raise Disconnected()
         data += recieved
 
     rno, l = unpack(">II", data)
@@ -26,7 +29,7 @@ def read_message(sock):
         recieved = sock.recv(l-len(data))
         if not recieved:
             logger.info("read_message disconnected %s", sock)
-            raise gevent.GreenletExit()
+            raise Disconnected()
         data += recieved
 
     return rno, marshal.loads(data)
@@ -45,7 +48,7 @@ def write_message(sock, rno, *a):
         except socket.error, err:
             if err.args[0] in disconnected_errors:
                 logger.debug("write_message disconnected %s", sock)
-                raise gevent.GreenletExit()
+                raise Disconnected()
             else:
                 raise
         data = data[sent:]
@@ -55,7 +58,7 @@ def writer(writeq, sock, multiplexer):
         rno, data = writeq.get()
         try:
             write_message(sock, rno, data)
-        except gevent.GreenletExit:
+        except Disconnected:
             multiplexer.disconnected()
             return
 
@@ -84,11 +87,8 @@ class Worker:
     def end(self, rno):
         del self.readers[rno]
 
-    class Disconnected(Exception):
-        pass
-
     def put_disconnected(self, *a, **k):
-        raise self.Disconnected()
+        raise Disconnected()
 
     def disconnected(self):
         logger.info('worker disconnected %s', self.addr)

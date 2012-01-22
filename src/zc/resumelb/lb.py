@@ -51,7 +51,7 @@ class LB:
                 result = worker.handle(rclass, env, start_response)
                 self.pool.put(worker)
                 return result
-            except worker.Disconnected:
+            except zc.resumelb.util.Disconnected:
                 # XXX need to be more careful about whether
                 # start_response was called.
                 if (int(env.get('CONTENT_LENGTH', 0)) == 0 and
@@ -240,7 +240,7 @@ class Worker(zc.resumelb.util.Worker):
         while self.is_connected:
             try:
                 rno, data = zc.resumelb.util.read_message(socket)
-            except gevent.GreenletExit:
+            except zc.resumelb.util.Disconnected:
                 self.disconnected()
                 return
 
@@ -279,7 +279,7 @@ class Worker(zc.resumelb.util.Worker):
 
         data = get()
         if data is None:
-            raise self.Disconnected()
+            raise zc.resumelb.util.Disconnected()
         logger.debug('start_response %r', data)
         start_response(*data)
 
@@ -290,7 +290,7 @@ class Worker(zc.resumelb.util.Worker):
                     logger.debug('yield %r', data)
                     yield data
                 elif data is None:
-                    raise self.Disconnected()
+                    raise zc.resumelb.util.Disconnected()
                 else:
                     self.end(rno)
                     break

@@ -50,7 +50,7 @@ class Worker:
             while conn.is_connected:
                 try:
                     rno, data = zc.resumelb.util.read_message(sock)
-                except gevent.GreenletExit:
+                except zc.resumelb.util.Disconnected:
                     conn.disconnected()
                     self.connections.remove(conn)
                     return
@@ -120,7 +120,7 @@ class Worker:
                         for (rclass, (sum, n)) in byrclass.iteritems()
                         ))
 
-            except conn.Disconnected:
+            except zc.resumelb.util.Disconnected:
                 return # whatever
         except:
             error('handle_connection')
@@ -133,7 +133,7 @@ class Worker:
             if conn.is_connected:
                 try:
                     conn.put((0, resume))
-                except conn.Disconnected:
+                except zc.resumelb.util.Disconnected:
                     pass
 
 
