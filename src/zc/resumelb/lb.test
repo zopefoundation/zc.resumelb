@@ -292,7 +292,57 @@ It's not in the lb pool yet, because we haven't sent it's resume yet:
 
 But if we send a resume, it will be:
 
-    >>> write_message(workers[0].socket, 0, {})
+    >>> write_message(workers[0].socket, 0, {'h3.com': 10.0})
     >>> gevent.sleep(.01)
     >>> len(lb.pool.workers)
     2
+
+Adding and removing workers
+===========================
+
+We can add and remove workers by passing new address iterables to the
+lb set_worker_addrs method.
+
+Let's add a worker and wait for it to be connected:
+
+    >>> workers.append(Worker())
+    >>> lb.set_worker_addrs([w.addr for w in workers])
+    >>> wait_until(lambda : hasattr(workers[-1], 'socket'))
+    >>> write_message(workers[-1].socket, 0, {'h4.com': 10})
+    >>> gevent.sleep(.01)
+    >>> len(lb.pool.workers)
+    3
+
+If we submit an h4.com request, it will go to the new worker:
+
+    >>> g = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h4.com')])
+    >>> rno, env = read_message(workers[-1].socket)
+    >>> read_message(workers[-1].socket)
+    (1, '')
+
+Now, let's remove a worker:
+
+    >>> out = workers.pop(0)
+    >>> lb.set_worker_addrs([w.addr for w in workers])
+
+Removing a worker doesn't disconnect it, but it will prevent it from
+being reconnected if it disconnects in it's own.
+
+    >>> gevent.sleep(.01)
+    >>> len(lb.pool.workers)
+    3
+
+    >>> outsocket = out.socket
+    >>> outsocket.close()
+    >>> gevent.sleep(.01)
+    >>> len(lb.pool.workers)
+    2
+
+Because the lb didn't reconnect, out's socket is till the one from
+before that we closed:
+
+    >>> out.socket is outsocket
+    True
+
+Typically, by the time we remove an address, the worker will already
+have gone away.

@@ -30,14 +30,23 @@ class LB:
         self.classifier = classifier
         self.disconnect_message = disconnect_message
         self.pool = Pool(settings)
+        self.workletts = {}
+        self.set_worker_addrs(worker_addrs)
 
-        self.workletts = dict(
-            (addr, gevent.spawn(self.connect, addr))
-            for addr in worker_addrs
-            )
+    def set_worker_addrs(self, addrs):
+        addrs = set(addrs)
+        workletts = self.workletts
+        old = list(workletts)
+        for addr in addrs:
+            if addr not in workletts:
+                workletts[addr] = gevent.spawn(self.connect, addr, workletts)
 
-    def connect(self, addr):
-        while 1:
+        for addr in old:
+            if addr not in addrs:
+                workletts.pop(addr)
+
+    def connect(self, addr, workletts):
+        while addr in workletts:
             socket = gevent.socket.create_connection(addr)
             Worker(self.pool, socket, addr)
 
