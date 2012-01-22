@@ -137,8 +137,10 @@ class Worker:
                     pass
 
 
-def server_runner(app, global_conf, lb, history=500): # paste deploy hook
+def server_runner(app, global_conf, address, history=500, threads=1):
+    # paste deploy hook
     logging.basicConfig(level=logging.INFO)
-    host, port = lb.split(':')
-    Worker(app, (host, int(port)), dict(history=history))
+    host, port = address.split(':')
+    Worker(app, (host, int(port)), dict(history=history, threads=threads)
+           ).server.serve_forever()
 
