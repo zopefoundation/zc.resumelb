@@ -39,7 +39,6 @@ We didn't get a worker (we timed out), because we haven't added one.
     ...         return hash(self.name)
     ...     def handle(self, *args):
     ...         pass
-    ...     Disconnected = None
 
     >>> w1 = Worker('w1')
 
