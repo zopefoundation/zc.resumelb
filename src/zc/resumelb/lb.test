@@ -44,6 +44,7 @@ When the workers get connections, they send the lb their resumes:
 
     >>> write_message(worker1, 0, {'h1.com': 10.0})
     >>> write_message(worker2, 0, {'h2.com': 10.0})
+    >>> gevent.sleep(.01) # Give resumes time to arrive
 
 Now, let's make a request and make sure the data gets where it's
 supposed to go.
@@ -53,6 +54,7 @@ supposed to go.
     >>> g1 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
 
     >>> rno, env1 = read_message(worker1)
+
     >>> rno
     1
     >>> from pprint import pprint
@@ -305,7 +307,7 @@ that exists primarily for testing.  We'll change it on the lb.
 
     >>> lb.connect_sleep = 0.01
     >>> port = workers[0].server.server_port # We'll reuse below
-    >>> workers[0].server.kill()
+    >>> workers[0].server.stop()
     >>> socket = workers[0].socket
     >>> socket.close()
     >>> gevent.sleep(.01)

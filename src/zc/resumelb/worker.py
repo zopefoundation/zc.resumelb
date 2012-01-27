@@ -3,12 +3,12 @@ import errno
 import gevent
 import gevent.hub
 import gevent.server
+import gevent.threadpool
 import logging
 import sys
 import time
 import zc.mappingobject
 import zc.resumelb.util
-import zc.resumelb.thread
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +32,10 @@ class Worker:
         self.connections = set()
 
         if settings.get('threads'):
-            pool = zc.resumelb.thread.Pool(self.settings.threads)
+            pool = gevent.threadpool.ThreadPool(settings['threads'])
             self.apply = pool.apply
         else:
-            self.apply = lambda f, *a: f(*a)
+            self.apply = apply
 
         self.server = gevent.server.StreamServer(addr, self.handle_connection)
         self.server.start()
@@ -84,12 +84,15 @@ class Worker:
                     break
             f.seek(0)
 
+            response = [0]
             def start_response(status, headers, exc_info=None):
                 assert not exc_info # XXX
-                conn.put((rno, (status, headers)))
+                response[0] = (status, headers)
 
             try:
-                for data in self.apply(self.app, env, start_response):
+                body = self.apply(self.app, (env, start_response))
+                conn.put((rno, response[0]))
+                for data in body:
                     conn.put((rno, data))
 
                 conn.put((rno, ''))
