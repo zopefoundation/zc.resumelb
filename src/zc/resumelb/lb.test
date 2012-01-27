@@ -265,17 +265,19 @@ The GET and HEAD request will be send to worker2:
     ...    print repr(g.value)
     <200 OK text/html body='Hello test\n'>
     <200 OK text/html no body>
-    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
-    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
-    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
-    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
-    <502 Bad Gateway text/html body='<html><bo...tml>'/118>
+    <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
+    <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
+    <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
+    <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
+    <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
 
     >>> print greenlets[2].value.body
-    <html><body>
+    <BLANKLINE>
+    <html><meta http-equiv="refresh" content="1"><body>
     The server was unable to handle your request due to a transient failure.
     Please try again.
     </body></html>
+    <BLANKLINE>
 
 Automatic reconnection
 ======================

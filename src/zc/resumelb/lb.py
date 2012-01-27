@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 retry_methods = set(('GET', 'HEAD'))
 
-default_disconnect_message = """
+default_disconnect_message = '''
+<html><meta http-equiv="refresh" content="1"><body>
 The server was unable to handle your request due to a transient failure.
 Please try again.
-"""
+</body></html>
+'''
 
 class LB:
 
@@ -76,8 +78,7 @@ class LB:
                     return webob.Response(
                         status = '502 Bad Gateway',
                         content_type= 'text/html',
-                        body = ("<html><body>%s</body></html>"
-                                % self.disconnect_message)
+                        body = self.disconnect_message
                         )(env, start_response)
 
 class Pool:
