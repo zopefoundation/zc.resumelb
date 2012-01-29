@@ -57,6 +57,11 @@ class LB:
                 logger.exception('lb connecting to %r', addr)
                 gevent.sleep(self.connect_sleep)
 
+    def stop(self):
+        for g in self.workletts.values():
+            g.kill()
+        self.workletts.clear()
+
     def handle_wsgi(self, env, start_response):
         rclass = self.classifier(env)
         logger.debug('wsgi: %s', rclass)

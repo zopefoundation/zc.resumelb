@@ -357,3 +357,7 @@ We're due for another resume.  We should get it on both sockets!
     http://localhost/hi.html ->
     6115 10000 44bd0dbf8208fea52dc6180376d14798b86847bd
     <BLANKLINE>
+
+Cleanup:
+
+    >>> worker.stop()

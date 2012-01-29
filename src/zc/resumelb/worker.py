@@ -41,6 +41,9 @@ class Worker:
         self.server.start()
         self.addr = addr[0], self.server.server_port
 
+    def stop(self):
+        self.server.stop()
+
     def handle_connection(self, sock, addr):
         try:
             conn = zc.resumelb.util.Worker()
