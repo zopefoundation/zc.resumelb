@@ -5,6 +5,8 @@ import gevent.hub
 import gevent.server
 import gevent.threadpool
 import logging
+import marshal
+import os
 import sys
 import time
 import zc.mappingobject
@@ -22,11 +24,18 @@ def error(mess):
 
 class Worker:
 
-    def __init__(self, app, addr, settings):
+    def __init__(self, app, addr, settings, resume_file=None):
         self.app = app
         self.settings = zc.mappingobject.mappingobject(settings)
         self.worker_request_number = 0
+        self.resume_file = resume_file
         self.resume = {}
+        if self.resume_file and os.path.exists(self.resume_file):
+            try:
+                with open(self.resume_file) as f:
+                    self.resume = marshal.load(f)
+            except Exception:
+                logger.exception('reading resume file')
         self.time_ring = []
         self.time_ring_pos = 0
         self.connections = set()
@@ -135,6 +144,14 @@ class Worker:
 
     def new_resume(self, resume):
         self.resume = resume
+
+        if self.resume_file:
+            try:
+                with open(self.resume_file, 'w') as f:
+                    marshal.dump(resume, f)
+            except Exception:
+                logger.exception('reading resume file')
+
         for conn in self.connections:
             if conn.is_connected:
                 try:

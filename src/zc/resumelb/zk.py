@@ -22,6 +22,7 @@ import zc.parse_addr
 import zc.zk
 
 def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
+           resume_file=None,
            run=True):
     """Paste deploy server runner
     """
@@ -32,7 +33,7 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
     zk = zc.zk.ZooKeeper(zookeeper)
     address = zc.parse_addr.parse_addr(address)
     from zc.resumelb.worker import Worker
-    worker = Worker(app, address, zk.properties(path))
+    worker = Worker(app, address, zk.properties(path), resume_file)
     zk.register_server(path+'/providers', worker.addr)
     worker.zk = zk
     if run:

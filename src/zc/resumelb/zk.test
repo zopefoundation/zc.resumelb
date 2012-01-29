@@ -54,12 +54,16 @@ loggers
 Let's create a worker, making sure that ZConfig.configureLoggers was called.
 
     >>> app = zc.resumelb.tests.app()
-    >>> import mock
+    >>> import mock, marshal
+    >>> with open('resume.mar', 'w') as f:
+    ...     marshal.dump(dict(a=1.0, b=2.0), f)
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
     ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
-    ...         address='127.0.0.1:0', run=False, loggers='loggers')
+    ...         address='127.0.0.1:0', run=False, loggers='loggers',
+    ...         resume_file='resume.mar',
+    ...         )
     ...     configureLoggers.assert_called_with('loggers')
 
 Normally, when used with paste, the worker function runs forever.  We
@@ -70,6 +74,12 @@ The worker got it's settings from the tree:
 
     >>> worker.settings.history
     999
+
+It loaded it's resume from resume.mar:
+
+    >>> from pprint import pprint
+    >>> pprint(worker.resume)
+    {'a': 1.0, 'b': 2.0}
 
 It register's it's address as an emphemeral subnode of the provider's
 subnode of the given path:
@@ -243,7 +253,7 @@ By looking at the lb's pool's skilled data structure, we can see that
 the test request classifier was used.
 
     >>> list(lb.pool.skilled)
-    ["yup, it's a test"]
+    ['a', 'b', "yup, it's a test"]
 
 OK. now let's shut down the server and lb.
 

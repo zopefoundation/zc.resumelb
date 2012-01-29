@@ -361,3 +361,42 @@ We're due for another resume.  We should get it on both sockets!
 Cleanup:
 
     >>> worker.stop()
+
+Saving and loading resumes
+--------------------------
+
+Workers can store their resumes.  This is useful if a worker has
+state, such as cache data that can be retained accross restarts.  A
+worker will load data from and save data to a file if the
+``resume_file`` option is used to specify a resume file name:
+
+    >>> import marshal
+    >>> with open('resume.mar', 'w') as f:
+    ...     marshal.dump(dict(a=1.0, b=2.0), f)
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=2),
+    ...   resume_file='resume.mar')
+
+    >>> from pprint import pprint
+    >>> env = newenv('test', '/hi.html')
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> pprint(read_message(worker_socket))
+    (0, {'a': 1.0, 'b': 2.0})
+
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1) # doctest: +ELLIPSIS
+    1 200 OK...
+    >>> write_message(worker_socket, 2, env, '')
+    >>> print_response(worker_socket, 2) # doctest: +ELLIPSIS
+    2 200 OK...
+
+At this point, the worker should have output a new resume.
+
+    >>> rno, resume = read_message(worker_socket)
+    >>> rno, list(resume)
+    (0, ['test'])
+
+    >>> with open('resume.mar') as f:
+    ...     list(marshal.load(f))
+    ['test']
