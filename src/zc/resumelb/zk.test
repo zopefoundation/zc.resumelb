@@ -1,0 +1,257 @@
+=====================
+ZooKeeper integration
+=====================
+
+    >>> import zc.resumelb.zk, zc.resumelb.tests, zc.zk
+    >>> zk = zc.zk.ZooKeeper('zookeeper.example.com:2181')
+
+To demonstrate the integration, we'll set up a tree:
+
+    >>> zk.import_tree("""
+    ... /test
+    ...   /lb
+    ...     /providers
+    ...     /workers
+    ...       history=999
+    ...       /providers
+    ... """)
+
+There are some things to note about this tree:
+
+- We have an lb node, where we'll configure an lb.  It has a workers
+  subnode where we'll configure the workers.  This subnode could be a
+  regular node, or a symbolic link.
+
+- Addresses of running workers and load balancers will be registered
+  at provider subnodes.
+
+Workers
+=======
+
+There's a paste server runner that:
+
+- Registers with ZooKeeper, and
+
+- Get's settings from ZooKeeper.
+
+The server runner takes options:
+
+zookeeper
+  A ZooKeeper connection string
+
+path
+  A zookeeper where he worker will get settings and publish it's
+  address.
+
+address
+  Address to listen on, of the form HOST:PORT
+
+  This defaults to ":0", to bind to a dynamic port on all IPv4 addresses.
+
+loggers
+  A ZConfig loggers-definition string
+
+Let's create a worker, making sure that ZConfig.configureLoggers was called.
+
+    >>> app = zc.resumelb.tests.app()
+    >>> import mock
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...     worker = zc.resumelb.zk.worker(
+    ...         app, None,
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         address='127.0.0.1:0', run=False, loggers='loggers')
+    ...     configureLoggers.assert_called_with('loggers')
+
+Normally, when used with paste, the worker function runs forever.  We
+passed the run argument with a false value. The run argument exists
+soley for testing.
+
+The worker got it's settings from the tree:
+
+    >>> worker.settings.history
+    999
+
+It register's it's address as an emphemeral subnode of the provider's
+subnode of the given path:
+
+    >>> [waddr] = zk.get_children('/test/lb/workers/providers')
+    >>> waddr == "%s:%s" % worker.addr
+    True
+
+    >>> meta = zk.get('/test/lb/workers/providers/' + waddr)[1]
+    >>> bool(meta['ephemeralOwner'])
+    True
+
+LB
+==
+
+There's a script entry point for a load balancer.  It takes
+command-line arguments and also has a run keyword argument for
+testing. As an added testing convenience, if arguments are passed as a
+string, the string is split and testing mode (run=False) is assumed.
+
+    >>> zc.resumelb.zk.lbmain('-h')
+    Usage: test [options] zookeeper_connection path
+    <BLANKLINE>
+        Run a resume-based load balancer on addr.
+    <BLANKLINE>
+    <BLANKLINE>
+    Options:
+      -h, --help            show this help message and exit
+      -a ADDRESS, --address=ADDRESS
+                            Address to listed on for web requests
+      -l ACCESS_LOG, --access-log=ACCESS_LOG
+                            Access-log path.  Use - (default) for
+                            standard output and an empty string to
+                            suppress.
+      -b BACKLOG, --backlog=BACKLOG
+                            Server backlog setting.
+      -m MAX_CONNECTIONS, --max-connections=MAX_CONNECTIONS
+                            Maximum number of simultanious accepted
+                            connections.
+      --logger-configuration=LOGGER_CONFIGURATION
+                            Read logger configuration from the given
+                            configuration file path.  The configuration
+                            file must be in ZConfig logger configuration
+                            syntax.
+      -r REQUEST_CLASSIFIER, --request-classifier=REQUEST_CLASSIFIER
+                            Request classification function
+                            (module:expr)
+      -e DISCONNECT_MESSAGE, --disconnect-message=DISCONNECT_MESSAGE
+                            Path to error page to use when a request is
+                            lost due to worker disconnection
+
+
+Let's start with a simple call:
+
+    >>> lb, server, accesslog = zc.resumelb.zk.lbmain(
+    ...     'zookeeper.example.com:2181 /test/lb')
+
+    >>> import sys
+    >>> accesslog is sys.stdout
+    True
+
+At this point, the lb is running and listening on all interfaces using
+a self assigned port.
+
+It has connected to the worker and thus has a pool size of one:
+
+    >>> len(lb.pool.workers)
+    1
+
+Let's make a web request.  First, we'll get the lb address from ZooKeeper:
+
+    >>> import zc.parse_addr
+    >>> addr = zc.parse_addr.parse_addr(
+    ...     zk.get_children('/test/lb/providers')[0])
+
+All of the addresses are ips, not hostnames. None of them include localhost:
+
+    >>> [a for a in zk.get_children('/test/lb/providers')
+    ...  if a.startswith('localhost:')]
+    []
+
+
+Then we'll make a simpler GET request:
+
+    >>> import gevent.socket
+    >>> sock = gevent.socket.create_connection(('127.0.0.1', addr[1]))
+    >>> sock.sendall('''GET /hi.html HTTP/1.0\r
+    ... Host: h1.com\r
+    ... Content-Length: 0\r
+    ... \r
+    ... ''')
+
+    >>> print sock.recv(9999) # doctest: +ELLIPSIS
+    127.0.0.1 - - [2012-01-28 15:29:30] "GET /hi.html HTTP/1.0" 200 226 0.002349
+    HTTP/1.0 200 OK...
+
+If we create another worker, it will be seen by the load balancer:
+
+    >>> worker2 = zc.resumelb.zk.worker(
+    ...     app, None,
+    ...     zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...     address='127.0.0.1:0', run=False)
+
+    >>> len(lb.pool.workers)
+    2
+
+OK, so let's try a more complex examlpe.  Maybe we can exercise all of
+the options!
+
+    >>> server.stop()
+    >>> lb.stop()
+    >>> lb.zk.close()
+
+    >>> with open('log.conf', 'w') as f:
+    ...   f.write('loggers')
+
+    >>> with open('oops.html', 'w') as f:
+    ...   f.write("oops")
+
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...     lb, server, accesslog = zc.resumelb.zk.lbmain(
+    ...         'zookeeper.example.com:2181 /test/lb'
+    ...         ' -alocalhost:0 -laccess.log -b1 -m1'
+    ...         ' --logger-configuration log.conf '
+    ...         ' -rzc.resumelb.tests:test_classifier -eoops.html'
+    ...         )
+    ...     configureLoggers.assert_called_with('loggers')
+
+    >>> lb.disconnect_message
+    'oops'
+
+    >>> [addr] = map(zc.parse_addr.parse_addr,
+    ...              zk.get_children('/test/lb/providers'))
+
+    >>> addr[0]
+    'localhost'
+
+    >>> len(lb.pool.workers)
+    2
+
+    >>> sock = gevent.socket.create_connection(addr)
+    >>> sock2 = gevent.socket.create_connection(addr)
+    >>> sock3 = gevent.socket.create_connection(addr, .01)
+    Traceback (most recent call last):
+    ...
+    timeout: timed out
+
+The 3rd collection failed because we said to only accept one
+connection at a time and set the backlog to 1.
+
+Let's do a request.
+
+    >>> sock.sendall('''GET /hi.html HTTP/1.0\r
+    ... Host: h1.com\r
+    ... Content-Length: 0\r
+    ... \r
+    ... ''')
+    >>> print sock.recv(9999) # doctest: +ELLIPSIS
+    HTTP/1.0 200 OK...
+
+We didn't get an access log entry in the output, because it's in the
+access log.
+
+    >>> accesslog.flush()
+    >>> with open('access.log') as f:
+    ...     print f.read()
+    127.0.0.1 - - [2012-01-29 14:11:37] "GET /hi.html HTTP/1.0" 200 226 0.001074
+    <BLANKLINE>
+
+By looking at the lb's pool's skilled data structure, we can see that
+the test request classifier was used.
+
+    >>> list(lb.pool.skilled)
+    ["yup, it's a test"]
+
+OK. now let's shut down the server and lb.
+
+    >>> server.stop()
+    >>> lb.stop()
+    >>> lb.zk.close()
+
+And the workers:
+
+    >>> worker.stop()
+    >>> worker2.stop()

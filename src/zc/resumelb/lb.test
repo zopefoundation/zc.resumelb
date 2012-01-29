@@ -32,7 +32,7 @@ We have some workers running. Now, let's create a load balancer:
 We pass the constructor an iterable of addresses.  The lb will connect
 to these addresses. Let's wait for it to do so:
 
-    >>> wait_until(
+    >>> wait(
     ...     lambda :
     ...     len([w for w in workers if hasattr(w, 'socket')]) == len(workers)
     ...     )
@@ -327,7 +327,7 @@ Now, we'll recreate the worker server and after a bit, the lb should reconnect:
     >>> workers[0].server = gevent.server.StreamServer(
     ...     ('127.0.0.1', port), workers[0].handle)
     >>> workers[0].server.start()
-    >>> wait_until(lambda : workers[0].socket is not socket)
+    >>> wait(lambda : workers[0].socket is not socket)
     >>> write_message(workers[0].socket, 0, {'h3.com': 10.0})
     >>> gevent.sleep(.01)
     >>> len(lb.pool.workers)
@@ -344,7 +344,7 @@ Let's add a worker and wait for it to be connected:
 
     >>> workers.append(Worker())
     >>> lb.set_worker_addrs([w.addr for w in workers])
-    >>> wait_until(lambda : hasattr(workers[-1], 'socket'))
+    >>> wait(lambda : hasattr(workers[-1], 'socket'))
     >>> write_message(workers[-1].socket, 0, {'h4.com': 10})
     >>> gevent.sleep(.01)
     >>> len(lb.pool.workers)
@@ -384,3 +384,6 @@ before that we closed:
 Typically, by the time we remove an address, the worker will already
 have gone away.
 
+Cleanup:
+
+    >>> lb.stop()

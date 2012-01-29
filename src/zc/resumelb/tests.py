@@ -19,9 +19,14 @@ import manuel.capture
 import manuel.doctest
 import manuel.testing
 import os
+import re
 import time
 import unittest
 import webob
+import zc.zk.testing
+import zope.testing.setupstack
+import zope.testing.wait
+import zope.testing.renormalizing
 
 pid = os.getpid()
 
@@ -46,28 +51,40 @@ def sleep(dur=0):
 def app():
     return bobo.Application(bobo_resources=__name__)
 
-def wait_until(func=None, timeout=9):
-    if func is None:
-        return lambda f: wait_until(f, timeout)
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if func():
-            return
-        gevent.sleep(.01)
-    raise ValueError('timeout')
+def test_classifier(env):
+    return "yup, it's a test"
 
 def setUp(test):
+    zope.testing.setupstack.setUpDirectory(test)
     global pid
     pid = 6115
-    test.globs['wait_until'] = wait_until
+    test.globs['wait'] = zope.testing.wait.Wait(getsleep=lambda : gevent.sleep)
+
+def zkSetUp(test):
+    setUp(test)
+    zc.zk.testing.setUp(test)
+    os.environ['COLUMNS'] = '70'
+
+def zkTearDown(test):
+    zc.zk.testing.tearDown(test)
+    zope.testing.setupstack.tearDown(test)
 
 def test_suite():
     return unittest.TestSuite((
         manuel.testing.TestSuite(
             manuel.doctest.Manuel() + manuel.capture.Manuel(),
-            *(sorted(name for name in os.listdir(os.path.dirname(__file__))
-                     if name.endswith('.test')
-                     )),
-            setUp=setUp),
+            'lb.test', 'pool.test', 'worker.test',
+            setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
+        manuel.testing.TestSuite(
+            manuel.doctest.Manuel(
+                checker = zope.testing.renormalizing.OutputChecker([
+                    (re.compile(
+                        r'\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] "(.+) \d+\.\d+'
+                        ),
+                     'ACCESS'),
+                    ])
+                ) + manuel.capture.Manuel(),
+            'zk.test',
+            setUp=zkSetUp, tearDown=zkTearDown),
         ))
 
