@@ -38,7 +38,7 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
     worker.zk = zk
     if run:
         try:
-            worker.server.run_forever()
+            worker.server.serve_forever()
         finally:
             logging.getLogger(__name__+'.worker').info('exiting')
             zk.close()
@@ -65,7 +65,7 @@ def lbmain(args=None, run=True):
     parser.add_option(
         '-l', '--access-log', default='-',
         help='Access-log path.\n\n'
-        'Use - (default) for standard output and an empty string to suppress.\n'
+        'Use - (default) for standard output.\n'
         )
     parser.add_option(
         '-b', '--backlog', type='int',
@@ -141,8 +141,11 @@ def lbmain(args=None, run=True):
         spawn= gevent.pool.Pool(options.max_connections)
     else:
         spawn = 'default'
-    accesslog = (sys.stdout if options.access_log == '-'
-                 else open(options.access_log, 'a'))
+
+    accesslog = options.access_log
+    if isinstance(accesslog, str):
+        accesslog = sys.stdout if accesslog == '-' else open(accesslog, 'a')
+
     server = gevent.pywsgi.WSGIServer(
         addr, lb.handle_wsgi, backlog = options.backlog,
         spawn = spawn, log = accesslog)
