@@ -105,7 +105,8 @@ class Worker:
                 body = self.apply(self.app, (env, start_response))
                 conn.put((rno, response[0]))
                 for data in body:
-                    conn.put((rno, data))
+                    if data:
+                        conn.put((rno, data))
 
                 conn.put((rno, ''))
 

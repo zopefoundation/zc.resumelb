@@ -43,6 +43,15 @@ def gen(size=0):
         app_iter=['hello world\n'*1000]*size,
         content_length=12000*size)
 
+@bobo.query('/sneaky.html')
+def sneaky():
+    # The app_iter has empty strings!
+    return webob.Response(
+        app_iter=['', 'hello world\n'],
+        content_length=12)
+
+
+
 @bobo.query('/sleep.html')
 def sleep(dur=0):
     time.sleep(float(dur))

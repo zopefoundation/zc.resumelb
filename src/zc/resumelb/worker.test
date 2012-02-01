@@ -400,3 +400,21 @@ At this point, the worker should have output a new resume.
     >>> with open('resume.mar') as f:
     ...     list(marshal.load(f))
     ['test']
+
+Ignore empty strings in application iterables
+---------------------------------------------
+
+The lb/worker protocol uses empty strings as indicate end-of-message
+markers. If an application returns empty strings in it's returned
+iterable, the worker must ignore them.
+
+    >>> env = newenv('test', '/sneaky.html')
+    >>> write_message(worker_socket, 3, env, '')
+    >>> print_response(worker_socket, 3) # doctest: +ELLIPSIS
+    3 200 OK
+    Content-Length: 12
+    Content-Type: text/html; charset=UTF-8
+    <BLANKLINE>
+    hello world
+
+    >>> worker.stop()
