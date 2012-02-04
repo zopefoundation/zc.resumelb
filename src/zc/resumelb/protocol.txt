@@ -1,0 +1,18 @@
+LB's and workers communicate via a simple protocol
+===================================================
+
+They send each other sized network messages.  The network messages
+consist of:
+
+- 4-byte data size
+- 4-byte request number
+- Marshalled data
+
+The marshalled data can be:
+
+- environment dict from LB->worker
+- string part of HTTP message body
+- '' end of HTTP message marker
+- None from lb->worker indicating request cancelation
+- (status, headers) worker->lb start response
+
