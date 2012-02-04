@@ -417,4 +417,76 @@ iterable, the worker must ignore them.
     <BLANKLINE>
     hello world
 
+
+Cancellation
+------------
+
+The load balancer can cancel a request at various stages.
+
+If we send a cancelation after a request has been finalized, the
+cancellation is ignored:
+
+    >>> write_message(worker_socket, 3, None)
+    >>> gevent.sleep(.01)
+
+We can cancel a request before sending input data:
+
+    >>> env = newenv('test', '/hi.html', method='POST', body='xxx')
+    >>> write_message(worker_socket, 4, env)
+    >>> gevent.sleep(.01)
+    >>> write_message(worker_socket, 4, None)
+
+Or after sending some data:
+
+    >>> write_message(worker_socket, 5, env, 'x')
+    >>> gevent.sleep(.01)
+    >>> write_message(worker_socket, 5, None)
+
+Or after sending a complete request, but so that the worker will see
+cancellation before rending a response, because the app takes some time:
+
+    >>> env = newenv('test', '/gsleep.html?dur=.1')
+    >>> write_message(worker_socket, 6, env, '', None)
+
+Or requesting tons of data, but before recieving all of it:
+
+    >>> env = newenv('test', '/gen.html?size=1000')
+    >>> write_message(worker_socket, 7, env, '')
+    >>> gevent.sleep(.01)
+    >>> write_message(worker_socket, 7, env, None)
+
+OK, so we sent 3 requests and cancelled all of them.  We shouldn't see
+any output for 4 and 5, as they were cancelled completed before they
+were completed.  Request 6 will be performed. Some output will be
+probably be written to the socket before the cancellation is seen, but
+not all of it.
+
+We'll send another request to act as a marker in the output we get
+back:
+
+    >>> env = newenv('test', '/hi.html')
+    >>> write_message(worker_socket, 8, env, '')
+
+Now, we'll read data until we get a response record for request 7:
+
+    >>> rno = 0
+    >>> while rno != 8:
+    ...     rno, data = read_message(worker_socket)
+    ...     print rno, repr(data)[:60]
+    ...     # doctest: +ELLIPSIS
+    7 ('200 OK', [('Content-Type', 'text/html; charset=UTF-8'), ('
+    ...
+    7 'hello world\nhello world\nhello world\nhello world\nhello w
+    8 ('200 OK', [('Content-Type', 'text/html; charset=UTF-8; char
+
+Note that we didn't get output for requests 4, 5 or 6, because they
+were cancelled before they were started or before they started sending
+a response. We got some, but not all of the data for request 7.  We
+know we didn't get it all because we didn't get the end of-of-request
+marker.
+
+cleanup
+--------------------------------------------------------------------
+
+
     >>> worker.stop()

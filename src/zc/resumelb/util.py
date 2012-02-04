@@ -70,7 +70,7 @@ class Worker:
         logger.info('worker connected %s', addr)
         self.addr = addr
         self.readers = {}
-        writeq = gevent.queue.Queue()
+        writeq = gevent.queue.Queue(9)
         gevent.Greenlet.spawn(writer, writeq, socket, self)
         self.put = writeq.put
         self.is_connected = True
@@ -85,7 +85,10 @@ class Worker:
         return readq.get
 
     def end(self, rno):
-        del self.readers[rno]
+        try:
+            del self.readers[rno]
+        except KeyError:
+            pass # previously cancelled
 
     def put_disconnected(self, *a, **k):
         raise Disconnected()

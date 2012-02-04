@@ -69,12 +69,16 @@ class Worker:
 
                 rput = readers.get(rno)
                 if rput is None:
-                    env = data
-                    env['zc.resumelb.time'] = time.time()
-                    env['zc.resumelb.lb_addr'] = addr
-                    gevent.spawn(self.handle, conn, rno, conn.start(rno), env)
+                    if data:
+                        env = data
+                        env['zc.resumelb.time'] = time.time()
+                        env['zc.resumelb.lb_addr'] = addr
+                        gevent.spawn(
+                            self.handle, conn, rno, conn.start(rno), env)
                 else:
                     rput(data)
+                    if data is None:
+                        del readers[rno]
         except:
             error('handle_connection')
 
@@ -102,9 +106,14 @@ class Worker:
                 response[0] = (status, headers)
 
             try:
+                requests = conn.readers
                 body = self.apply(self.app, (env, start_response))
+                if rno not in requests:
+                    return # cancelled
                 conn.put((rno, response[0]))
                 for data in body:
+                    if rno not in requests:
+                        return # cancelled
                     if data:
                         conn.put((rno, data))
 
