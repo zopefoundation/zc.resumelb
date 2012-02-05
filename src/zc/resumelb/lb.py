@@ -283,37 +283,43 @@ class Worker(zc.resumelb.util.Worker):
         rno = self.nrequest + 1
         self.nrequest = rno % self.maxrno
         get = self.start(rno)
+        try:
+            self.put((rno, env))
+            content_length = int(env.get('CONTENT_LENGTH', 0))
+            while content_length > 0:
+                data = input.read(min(content_length, block_size))
+                if not data:
+                    # Browser disconnected, cancel the request
+                    self.put((rno, None))
+                    self.end(rno)
+                    return
+                content_length -= len(data)
+                self.put((rno, data))
+            self.put((rno, ''))
 
-        self.put((rno, env))
-        content_length = int(env.get('CONTENT_LENGTH', 0))
-        while content_length > 0:
-            data = input.read(min(content_length, block_size))
-            if not data:
-                # Browser disconnected, cancel the request
-                self.put((rno, None))
-                self.end(rno)
-                return
-            content_length -= len(data)
-            self.put((rno, data))
-        self.put((rno, ''))
-
-        data = get()
-        if data is None:
-            raise zc.resumelb.util.Disconnected()
-        logger.debug('start_response %r', data)
-        start_response(*data)
+            data = get()
+            if data is None:
+                raise zc.resumelb.util.Disconnected()
+            logger.debug('start_response %r', data)
+            start_response(*data)
+        except:
+            # not using finally here, because we only want to end on error
+            self.end(rno)
+            raise
 
         def content():
-            while 1:
-                data = get()
-                if data:
-                    logger.debug('yield %r', data)
-                    yield data
-                elif data is None:
-                    raise zc.resumelb.util.Disconnected()
-                else:
-                    self.end(rno)
-                    break
+            try:
+                while 1:
+                    data = get()
+                    if data:
+                        logger.debug('yield %r', data)
+                        yield data
+                    elif data is None:
+                        raise zc.resumelb.util.Disconnected()
+                    else:
+                        break
+            finally:
+                self.end(rno)
 
         return content()
 
