@@ -17,7 +17,7 @@ install_requires = [
     'setuptools', 'gevent >=1.0b1', 'WebOb', 'zc.thread', 'zc.parse_addr',
     'zc.mappingobject', 'llist']
 extras_require = dict(
-    test=['zope.testing', 'bobo', 'manuel', 'WebTest', 'zc.zk',
+    test=['zope.testing', 'bobo', 'manuel', 'WebTest', 'zc.zk [test]',
           'ZConfig', 'mock'])
 
 entry_points = """

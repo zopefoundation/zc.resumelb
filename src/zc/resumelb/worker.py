@@ -1,4 +1,5 @@
 import cStringIO
+import datetime
 import errno
 import gevent
 import gevent.hub
@@ -24,7 +25,8 @@ def error(mess):
 
 class Worker:
 
-    def __init__(self, app, addr, settings, resume_file=None):
+    def __init__(self, app, addr, settings,
+                 resume_file=None, threads=None, tracelog=None):
         self.app = app
         self.settings = zc.mappingobject.mappingobject(settings)
         self.worker_request_number = 0
@@ -40,11 +42,65 @@ class Worker:
         self.time_ring_pos = 0
         self.connections = set()
 
-        if settings.get('threads'):
-            pool = gevent.threadpool.ThreadPool(settings['threads'])
-            self.apply = pool.apply
+        if threads:
+            self.threadpool = gevent.threadpool.ThreadPool(threads)
+            pool_apply = self.threadpool.apply
         else:
-            self.apply = apply
+            pool_apply = None
+
+        def call_app(rno, env):
+            response = [0]
+            def start_response(status, headers, exc_info=None):
+                assert not exc_info # XXX
+                response[0] = (status, headers)
+            body = app(env, start_response)
+            return response[0], body
+
+        if tracelog:
+            info = logging.getLogger(tracelog).info
+            no_message_format = '%s %s %s'
+            message_format = '%s %s %s %s'
+            now = datetime.datetime.now
+            def log(rno, code, message=None):
+                if message:
+                    info(message_format, code, rno, now(), message)
+                else:
+                    info(no_message_format, code, rno, now())
+            tracelog = log
+
+            def call_app_w_tracelog(rno, env):
+                log(rno, 'C')
+                env['tracelog'] = (
+                    lambda code, message=None: log(rno, code, message)
+                    )
+                response, body = call_app(rno, env)
+                content_length = [v for (h, v) in response[1]
+                                  if h.lower() == 'content-length']
+                content_length = content_length[-1] if content_length else '?'
+                log(rno, 'A', "%s %s" % (response[0], content_length))
+                def body_iter():
+                    try:
+                        for data in body:
+                            yield data
+                    finally:
+                        if hasattr(body, 'close'):
+                            body.close()
+                        log(rno, 'E')
+                return response, body_iter()
+
+            if threads:
+                def call_app_w_threads(rno, env):
+                    log(rno, 'I', env.get('CONTENT_LENGTH', 0))
+                    return pool_apply(call_app_w_tracelog, (rno, env))
+                self.call_app = call_app_w_threads
+            else:
+                self.call_app = call_app_w_tracelog
+        elif threads:
+            self.call_app = lambda rno, env: pool_apply(call_app, (rno, env))
+        else:
+            self.call_app = call_app
+
+        self.tracelog = tracelog
 
         self.server = gevent.server.StreamServer(addr, self.handle_connection)
         self.server.start()
@@ -52,6 +108,8 @@ class Worker:
 
     def stop(self):
         self.server.stop()
+        if hasattr(self, 'threadpool'):
+            self.threadpool.kill()
 
     def handle_connection(self, sock, addr):
         try:
@@ -84,11 +142,17 @@ class Worker:
 
     def handle(self, conn, rno, get, env):
         try:
-            f = cStringIO.StringIO()
-            env['wsgi.input'] = f
+            if self.tracelog:
+                query_string = env.get('QUERY_STRING')
+                url = env['PATH_INFO']
+                if query_string:
+                    url += '?' + query_string
+                self.tracelog(rno, 'B', '%s %s' % (env['REQUEST_METHOD'], url))
+
             env['wsgi.errors'] = sys.stderr
 
-            # XXX We're buffering input.  It maybe should to have option not to.
+            # XXX We're buffering input. Maybe should to have option not to.
+            f = cStringIO.StringIO()
             while 1:
                 data = get()
                 if data:
@@ -99,18 +163,14 @@ class Worker:
                 else:
                     break
             f.seek(0)
+            env['wsgi.input'] = f
 
-            response = [0]
-            def start_response(status, headers, exc_info=None):
-                assert not exc_info # XXX
-                response[0] = (status, headers)
-
+            response, body = self.call_app(rno, env)
             try:
                 requests = conn.readers
-                body = self.apply(self.app, (env, start_response))
                 if rno not in requests:
                     return # cancelled
-                conn.put((rno, response[0]))
+                conn.put((rno, response))
                 for data in body:
                     if rno not in requests:
                         return # cancelled
@@ -147,6 +207,9 @@ class Worker:
 
             except zc.resumelb.util.Disconnected:
                 return # whatever
+            finally:
+                if hasattr(body, 'close'):
+                    body.close()
         except:
             error('handle_connection')
         finally:
@@ -170,10 +233,11 @@ class Worker:
                     pass
 
 
-def server_runner(app, global_conf, address, history=500, threads=1):
+def server_runner(app, global_conf, address, history=500, threads=0, **kw):
     # paste deploy hook
     logging.basicConfig(level=logging.INFO)
     host, port = address.split(':')
-    Worker(app, (host, int(port)), dict(history=history, threads=threads)
-           ).server.serve_forever()
+    Worker(app, (host, int(port)), dict(history=history),
+           threads=threads and int(threads),
+           **kw).server.serve_forever()
 

@@ -50,11 +50,16 @@ def sneaky():
         app_iter=['', 'hello world\n'],
         content_length=12)
 
-
-
 @bobo.query('/sleep.html')
-def sleep(dur=0):
+def sleep(bobo_request, dur=0):
     time.sleep(float(dur))
+    if 'tracelog' in bobo_request.environ:
+        bobo_request.environ['tracelog']('T', 'test')
+    return 'hello world\n'
+
+@bobo.query('/gsleep.html')
+def gsleep(dur=0):
+    gevent.sleep(float(dur))
     return 'hello world\n'
 
 def app():

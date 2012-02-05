@@ -486,7 +486,76 @@ know we didn't get it all because we didn't get the end of-of-request
 marker.
 
 cleanup
---------------------------------------------------------------------
 
+    >>> worker.stop()
 
+Tracelog and thread-pool support
+--------------------------------
+
+Workers support tracelogs and thread pools.
+
+We're gonna be tricky and fake time, taking advantage of the knowledge
+that the worker constructor caches datetime.now when writing to trace logs:
+
+    >>> import datetime, mock
+    >>> now = datetime.datetime(2012, 2, 5, 1, 2, 3, 456)
+    >>> with mock.patch('datetime.datetime') as dtmock:
+    ...     dtmock.now.side_effect = lambda : now
+    ...     worker = zc.resumelb.worker.Worker(
+    ...       zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=5),
+    ...       tracelog='tracelog', threads=1)
+
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> pprint(read_message(worker_socket))
+    (0, {})
+
+By passing a threads object, we said we want a thread pool of size
+one. This will serialize request processing.
+
+If a tracelog argument is passed a logger name, then trace logs will
+be generated to the logger name.
+
+    >>> import logging, sys
+    >>> logger = logging.getLogger('tracelog')
+    >>> handler = logging.StreamHandler(sys.stdout)
+    >>> logger.addHandler(handler)
+    >>> logger.setLevel(logging.INFO)
+
+Now, we'll make some requests:
+
+    >>> write_message(worker_socket, 1, newenv('', '/sleep.html?dur=.1'))
+    >>> gevent.sleep(.01)
+    B 1 2012-02-05 01:02:03.000456 GET /sleep.html?dur=.1
+    >>> now += datetime.timedelta(microseconds=10000)
+    >>> write_message(worker_socket, 2, newenv('', '/sleep.html?dur=.1'))
+    >>> gevent.sleep(.01)
+    B 2 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1
+    >>> now += datetime.timedelta(microseconds=10000)
+    >>> write_message(worker_socket, 2, '')
+    >>> gevent.sleep(.01)
+    I 2 2012-02-05 01:02:03.020456
+    C 2 2012-02-05 01:02:03.020456
+    >>> now += datetime.timedelta(microseconds=10000)
+    >>> write_message(worker_socket, 1, '')
+    >>> read_message(worker_socket) # doctest: +ELLIPSIS
+    I 1 2012-02-05 01:02:03.030456
+    T 2 2012-02-05 01:02:03.030456 test
+    A 2 2012-02-05 01:02:03.030456 200 OK 12
+    C 1 2012-02-05 01:02:03.030456
+    E 2 2012-02-05 01:02:03.030456
+    (2, ('200 OK', [('Content-Type', ...
+    >>> read_message(worker_socket)
+    (2, 'hello world\n')
+    >>> read_message(worker_socket)
+    (2, '')
+    >>> read_message(worker_socket) # doctest: +ELLIPSIS
+    T 1 2012-02-05 01:02:03.030456 test
+    A 1 2012-02-05 01:02:03.030456 200 OK 12
+    E 1 2012-02-05 01:02:03.030456
+    (1, ('200 OK', [...('Content-Length', '12')]))
+
+Cleanup:
+
+    >>> logger.removeHandler(handler)
+    >>> logger.setLevel(logging.NOTSET)
     >>> worker.stop()
