@@ -502,7 +502,7 @@ that the worker constructor caches datetime.now when writing to trace logs:
     >>> with mock.patch('datetime.datetime') as dtmock:
     ...     dtmock.now.side_effect = lambda : now
     ...     worker = zc.resumelb.worker.Worker(
-    ...       zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=5),
+    ...       zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=2),
     ...       tracelog='tracelog', threads=1)
 
     >>> worker_socket = gevent.socket.create_connection(worker.addr)
@@ -553,6 +553,19 @@ Now, we'll make some requests:
     A 1 2012-02-05 01:02:03.030456 200 OK 12
     E 1 2012-02-05 01:02:03.030456
     (1, ('200 OK', [...('Content-Length', '12')]))
+
+Also, note that the worker score is based on the time spent in app. It
+doesn't include time waiting.  We can see this when the worker sends
+us it's resume:
+
+    >>> _ = read_message(worker_socket), read_message(worker_socket)
+    >>> _, resume = read_message(worker_socket)
+    >>> [(_, score)] = resume.items()
+    >>> score > 7.0
+    True
+
+(If we started computing elapsed time when we started waiting for a
+thread, the score would be less than 2/(.1+.2).)
 
 Cleanup:
 

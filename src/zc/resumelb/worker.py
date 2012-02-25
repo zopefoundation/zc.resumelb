@@ -50,6 +50,7 @@ class Worker:
 
         def call_app(rno, env):
             response = [0]
+            env['zc.resumelb.time'] = time.time()
             def start_response(status, headers, exc_info=None):
                 assert not exc_info # XXX
                 response[0] = (status, headers)
@@ -129,7 +130,6 @@ class Worker:
                 if rput is None:
                     if data:
                         env = data
-                        env['zc.resumelb.time'] = time.time()
                         env['zc.resumelb.lb_addr'] = addr
                         gevent.spawn(
                             self.handle, conn, rno, conn.start(rno), env)
