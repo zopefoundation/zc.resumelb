@@ -22,7 +22,7 @@ import zc.parse_addr
 import zc.zk
 
 def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
-           threads=None, run=True, **kw):
+           threads=None, backdoor=False, run=True, **kw):
     """Paste deploy server runner
     """
     if loggers:
@@ -42,7 +42,15 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
     watcher.start(lambda : worker.update_settings(settings))
     settings(lambda _: watcher.send())
 
-    zk.register_server(path+'/providers', worker.addr)
+    registration_data = {}
+    if backdoor == 'true':
+        from gevent import backdoor
+        bd = backdoor.BackdoorServer(('127.0.0.1', 0), locals())
+        bd.start()
+        registration_data['backdoor'] = '127.0.0.1:%s' % bd.server_port
+        worker.__bd = bd
+
+    zk.register_server(path+'/providers', worker.addr, **registration_data)
     worker.zk = zk
     worker.__zksettings = settings
 
@@ -80,6 +88,9 @@ def lbmain(args=None, run=True):
     parser.add_option(
         '-b', '--backlog', type='int',
         help="Server backlog setting.")
+    parser.add_option(
+        '-d', '--backdoor', action='store_true',
+        help="Run a backdoor server. Use with caution!")
     parser.add_option(
         '-m', '--max-connections', type='int',
         help="Maximum number of simultanious accepted connections.")
@@ -167,7 +178,16 @@ def lbmain(args=None, run=True):
         addr, lb.handle_wsgi, backlog = options.backlog,
         spawn = spawn, log = accesslog)
     server.start()
-    zk.register_server(path+'/providers', (addr[0], server.server_port))
+
+    registration_data = {}
+    if options.backdoor:
+        from gevent import backdoor
+        bd = backdoor.BackdoorServer(('127.0.0.1', 0), locals())
+        bd.start()
+        registration_data['backdoor'] = '127.0.0.1:%s' % bd.server_port
+
+    zk.register_server(path+'/providers', (addr[0], server.server_port),
+                       **registration_data)
 
     if run:
         try:

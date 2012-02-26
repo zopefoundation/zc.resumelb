@@ -115,6 +115,7 @@ string, the string is split and testing mode (run=False) is assumed.
                             standard output.
       -b BACKLOG, --backlog=BACKLOG
                             Server backlog setting.
+      -d, --backdoor        Run a backdoor server. Use with caution!
       -m MAX_CONNECTIONS, --max-connections=MAX_CONNECTIONS
                             Maximum number of simultanious accepted
                             connections.
