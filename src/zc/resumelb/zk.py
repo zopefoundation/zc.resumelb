@@ -32,11 +32,20 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
     zk = zc.zk.ZooKeeper(zookeeper)
     address = zc.parse_addr.parse_addr(address)
     from zc.resumelb.worker import Worker
-    worker = Worker(app, address, zk.properties(path),
-                    threads=threads and int(threads),
+
+    worker = Worker(app, address, threads=threads and int(threads),
                     **kw)
+
+    # Set up notification of settings changes.
+    settings = zk.properties(path)
+    watcher = gevent.get_hub().loop.async()
+    watcher.start(lambda : worker.update_settings(settings))
+    settings(lambda _: watcher.send())
+
     zk.register_server(path+'/providers', worker.addr)
     worker.zk = zk
+    worker.__zksettings = settings
+
     if run:
         try:
             worker.server.serve_forever()
@@ -110,7 +119,6 @@ def lbmain(args=None, run=True):
 
 
     zk = zc.zk.ZooKeeper(zookeeper)
-    settings = zk.properties(path)
     addrs = zk.children(path+'/workers/providers')
     rcmod, rcexpr = options.request_classifier.split(':')
     __import__(rcmod)
@@ -126,15 +134,23 @@ def lbmain(args=None, run=True):
 
     from zc.resumelb.lb import LB
     lb = LB(map(zc.parse_addr.parse_addr, addrs),
-            request_classifier, settings, disconnect_message)
-    lb.zk = zk
+            request_classifier, disconnect_message)
 
     # Set up notification of address changes.
-    watcher = gevent.get_hub().loop.async()
-    @watcher.start
+    awatcher = gevent.get_hub().loop.async()
+    @awatcher.start
     def _():
         lb.set_worker_addrs(map(zc.parse_addr.parse_addr, addrs))
-    addrs(lambda a: watcher.send())
+    addrs(lambda a: awatcher.send())
+
+    # Set up notification of address changes.
+    settings = zk.properties(path)
+    swatcher = gevent.get_hub().loop.async()
+    swatcher.start(lambda : lb.update_settings(settings))
+    settings(lambda a: swatcher.send())
+
+    lb.zk = zk
+    lb.__zk = addrs, settings
 
     # Now, start a wsgi server
     addr = zc.parse_addr.parse_addr(options.address)

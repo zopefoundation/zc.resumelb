@@ -8,7 +8,7 @@ Now, let's create a worker:
 
     >>> import zc.resumelb.worker, zc.resumelb.tests
     >>> worker = zc.resumelb.worker.Worker(
-    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=5))
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), history=5)
 
 Here we created a worker using a test application, telling it to
 an address to listen on and to update it's resume after every
@@ -375,7 +375,7 @@ worker will load data from and save data to a file if the
     ...     marshal.dump(dict(a=1.0, b=2.0), f)
 
     >>> worker = zc.resumelb.worker.Worker(
-    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=2),
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), history=2,
     ...   resume_file='resume.mar')
 
     >>> from pprint import pprint
@@ -502,7 +502,7 @@ that the worker constructor caches datetime.now when writing to trace logs:
     >>> with mock.patch('datetime.datetime') as dtmock:
     ...     dtmock.now.side_effect = lambda : now
     ...     worker = zc.resumelb.worker.Worker(
-    ...       zc.resumelb.tests.app(), ('127.0.0.1', 0), dict(history=2),
+    ...       zc.resumelb.tests.app(), ('127.0.0.1', 0), history=2,
     ...       tracelog='tracelog', threads=1)
 
     >>> worker_socket = gevent.socket.create_connection(worker.addr)

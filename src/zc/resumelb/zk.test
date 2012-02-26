@@ -72,7 +72,7 @@ soley for testing.
 
 The worker got it's settings from the tree:
 
-    >>> worker.settings.history
+    >>> worker.history
     999
 
 It loaded it's resume from resume.mar:

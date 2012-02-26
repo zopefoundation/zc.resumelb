@@ -7,7 +7,6 @@ import llist
 import logging
 import sys
 import webob
-import zc.mappingobject
 import zc.resumelb.util
 
 block_size = 1<<16
@@ -26,12 +25,12 @@ Please try again.
 class LB:
 
     def __init__(self, worker_addrs, classifier,
-                 settings=None,
                  disconnect_message=default_disconnect_message,
-                 ):
+                 **pool_settings):
         self.classifier = classifier
         self.disconnect_message = disconnect_message
-        self.pool = Pool(settings)
+        self.pool = Pool(**pool_settings)
+        self.update_settings = self.pool.update_settings
         self.workletts = {}
         self.set_worker_addrs(worker_addrs)
 
@@ -88,14 +87,23 @@ class LB:
 
 class Pool:
 
-    def __init__(self, settings=None):
-        if settings is None:
-            settings = {}
-        self.settings = settings
+    def __init__(self, redundancy=1, max_backlog=40, min_score=1.0,
+                 unskilled_score=None):
+        self.redundancy = redundancy
+        self.max_backlog = max_backlog
+        self.min_score = min_score
+        self.unskilled_score = unskilled_score
+
         self.workers = set()
         self.unskilled = llist.dllist()
         self.skilled = {}   # rclass -> {(score, workers)}
         self.event = gevent.event.Event()
+
+    def update_settings(self, settings):
+        for name in ('redundancy', 'max_backlog',
+                     'min_score', 'unskilled_score'):
+            if name in settings:
+                setattr(self, name, settings[name])
 
     def __repr__(self):
         outl = []
@@ -123,9 +131,8 @@ class Pool:
         unskilled = self.unskilled
         workers = self.workers
 
-        target_skills_per_worker = 1 + (
-            self.settings.get('redundancy', 1) * len(skilled) /
-            (len(workers) or 1))
+        target_skills_per_worker = (
+            1 + self.redundancy * len(skilled) / (len(workers) or 1))
 
         if worker in workers:
             for rclass, score in worker.resume.iteritems():
@@ -169,8 +176,8 @@ class Pool:
                 return None
 
         # Look for a skilled worker
-        max_backlog = self.settings.get('max_backlog', 40)
-        min_score = self.settings.get('min_score', 1.0)
+        max_backlog = self.max_backlog
+        min_score = self.min_score
         best_score = 0
         best_worker = None
         skilled = self.skilled.get(rclass)
@@ -227,7 +234,7 @@ class Pool:
                 # - The score will be higher than some the existing, so it'll
                 #   get work
                 # We also allow for an unskilled_score setting to override.
-                score = self.settings.get('unskilled_score', min_score)
+                score = self.unskilled_score or self.min_score
                 best_worker.resume[rclass] = score
                 skilled.add((score, best_worker))
 

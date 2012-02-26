@@ -10,7 +10,6 @@ import marshal
 import os
 import sys
 import time
-import zc.mappingobject
 import zc.resumelb.util
 
 logger = logging.getLogger(__name__)
@@ -25,10 +24,10 @@ def error(mess):
 
 class Worker:
 
-    def __init__(self, app, addr, settings,
+    def __init__(self, app, addr, history=999,
                  resume_file=None, threads=None, tracelog=None):
         self.app = app
-        self.settings = zc.mappingobject.mappingobject(settings)
+        self.history = history
         self.worker_request_number = 0
         self.resume_file = resume_file
         self.resume = {}
@@ -107,6 +106,10 @@ class Worker:
         self.server.start()
         self.addr = addr[0], self.server.server_port
 
+    def update_settings(self, data):
+        if 'history' in data:
+            self.history = data['history']
+
     def stop(self):
         self.server.stop()
         if hasattr(self, 'threadpool'):
@@ -181,7 +184,7 @@ class Worker:
 
                 elapsed = max(time.time() - env['zc.resumelb.time'], 1e-9)
                 time_ring = self.time_ring
-                time_ring_pos = rno % self.settings.history
+                time_ring_pos = rno % self.history
                 rclass = env['zc.resumelb.request_class']
                 try:
                     time_ring[time_ring_pos] = rclass, elapsed
@@ -191,7 +194,7 @@ class Worker:
 
                 worker_request_number = self.worker_request_number + 1
                 self.worker_request_number = worker_request_number
-                if worker_request_number % self.settings.history == 0:
+                if worker_request_number % self.history == 0:
                     byrclass = {}
                     for rclass, elapsed in time_ring:
                         sumn = byrclass.get(rclass)

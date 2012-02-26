@@ -17,8 +17,7 @@ constructor takes a settings mapping object.  This allows the settings
 to be managed in real time.
 
     >>> import zc.resumelb.lb
-    >>> settings = {}
-    >>> pool = zc.resumelb.lb.Pool(settings)
+    >>> pool = zc.resumelb.lb.Pool()
 
 The get method is used to get a worker from the pool.  A request class
 and an optional timeout is passed. (The timeout is mainly useful for
@@ -109,7 +108,7 @@ requests to w1.  This is because w1 hasn't reached it's maximum
 backlog.  Also, it's score is greater than the min score, which
 defaults to 1.0.  Let's reduce the maximum backlog to 5:
 
-    >>> settings['max_backlog'] = 5
+    >>> pool.max_backlog = 5
 
 So now, w1 has reached it's maximum backlog.  If
 we make another foo request, we'll start using w3, and when that's
@@ -291,7 +290,7 @@ When we look at the pool, we see that 4 of the items were discarded:
 Now we have 7 request classes and 4 workers.  If we set redundancy to
 3, then the expected resume size is 6, so::
 
-    >>> settings['redundancy'] = 3
+    >>> pool.redundancy = 3
     >>> pool.new_resume(w4, dict((str(i), float(i)) for i in range(9)))
 
     >>> pool
@@ -328,7 +327,7 @@ To see this, let's reduce w3's backlog:
 
 but set the min_score to 4:
 
-    >>> settings['min_score'] = 4.0
+    >>> pool.min_score = 4.0
 
 And the get a worker for foo:
 
