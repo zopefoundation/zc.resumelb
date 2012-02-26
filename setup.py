@@ -23,9 +23,11 @@ extras_require = dict(
 entry_points = """
 [console_scripts]
 resumelb = zc.resumelb.lb:main
+zkresumelb = zc.resumelb.zk:lbmain
 
 [paste.server_runner]
 main = zc.resumelb.worker:server_runner
+zk   = zc.resumelb.zk:worker
 """
 
 from setuptools import setup
