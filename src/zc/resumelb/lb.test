@@ -197,6 +197,18 @@ We'll interleave data for the 2 responses on worker1
     >>> g2.value.status, g2.value.body == '2'*10000
     ('200 OK', True)
 
+Disconnecting clients
+=====================
+
+Sometimes, a client will disconnect after a request starts, but before
+the worker has sent the result.  When this happens, the lb will get a
+message from a worker for a request number that isn't active.  We'll
+emulate this by sending a message with a bogus message #, and verify
+that nothing is broken:
+
+    >>> write_message(worker2, 99, '')
+    >>> gevent.sleep(.01)
+
 Pool Management
 ===============
 
@@ -397,6 +409,8 @@ before that we closed:
 
 Typically, by the time we remove an address, the worker will already
 have gone away.
+
+----------------------------------------------------------
 
 Cleanup:
 

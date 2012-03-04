@@ -263,7 +263,12 @@ class Worker(zc.resumelb.util.Worker):
             if rno == 0:
                 pool.new_resume(self, data)
             else:
-                readers[rno](data)
+                try:
+                    reader = readers[rno]
+                except KeyError:
+                    pass
+                else:
+                    reader(data)
 
     def __repr__(self):
         return self.__name__
