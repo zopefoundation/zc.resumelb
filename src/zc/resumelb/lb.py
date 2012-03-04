@@ -87,11 +87,8 @@ class LB:
 
 class Pool:
 
-    def __init__(self, redundancy=1, max_backlog=40, min_score=1.0,
-                 unskilled_score=None):
-        self.redundancy = redundancy
+    def __init__(self, max_backlog=40, unskilled_score=1.0):
         self.max_backlog = max_backlog
-        self.min_score = min_score
         self.unskilled_score = unskilled_score
 
         self.workers = set()
@@ -100,8 +97,7 @@ class Pool:
         self.event = gevent.event.Event()
 
     def update_settings(self, settings):
-        for name in ('redundancy', 'max_backlog',
-                     'min_score', 'unskilled_score'):
+        for name in ('max_backlog', 'unskilled_score'):
             if name in settings:
                 setattr(self, name, settings[name])
 
@@ -131,9 +127,6 @@ class Pool:
         unskilled = self.unskilled
         workers = self.workers
 
-        target_skills_per_worker = (
-            1 + self.redundancy * len(skilled) / (len(workers) or 1))
-
         if worker in workers:
             for rclass, score in worker.resume.iteritems():
                 skilled[rclass].remove((score, worker))
@@ -148,13 +141,8 @@ class Pool:
             workers.add(worker)
             worker.lnode = unskilled.appendleft(worker)
 
-        resumeitems = resume.items()
-        drop = (len(resume) - target_skills_per_worker) / 2
-        if drop > 0:
-            resumeitems = sorted(resumeitems, key=lambda i: i[1])[drop:]
-
-        worker.resume = dict(resumeitems)
-        for rclass, score in resumeitems:
+        worker.resume = resume
+        for rclass, score in resume.iteritems():
             try:
                 skilled[rclass].add((score, worker))
             except KeyError:
@@ -177,7 +165,6 @@ class Pool:
 
         # Look for a skilled worker
         max_backlog = self.max_backlog
-        min_score = self.min_score
         best_score = 0
         best_worker = None
         skilled = self.skilled.get(rclass)
@@ -185,21 +172,8 @@ class Pool:
             skilled = self.skilled[rclass] = set()
         for score, worker in skilled:
             backlog = worker.backlog + 1
-            if backlog > 2:
-                if (
-                    # Don't let a worker get too backed up
-                    backlog > max_backlog or
-
-                    # We use min score as a way of allowing other workers
-                    # a chance to pick up work even if the skilled workers
-                    # haven't reached their backlog.  This is mainly a tuning
-                    # tool for when a worker is doing OK, but maybe still
-                    # doing too much.
-                    (score < min_score and
-                     unskilled and unskilled.first.value.backlog == 0
-                     )
-                    ):
-                    continue
+            if backlog > max_backlog:
+                continue
             score /= backlog
             if (score > best_score):
                 best_score = score
@@ -221,20 +195,11 @@ class Pool:
 
                 # We now have an unskilled worker and we need to
                 # assign it a score.
-                # - It has to be >= min score, or it won't get future work.
                 # - We want to give it work somewhat gradually.
                 # - We got here because:
                 #   - there are no skilled workers,
-                #   - The skilled workers have all either:
-                #     - Eached their max backlog, or
-                #     - Have scores > min score
-                # Let's set it to min score because either:
-                # - There are no skilled workers, so they'll all get the same
-                # - Other workers are maxed out, or
-                # - The score will be higher than some the existing, so it'll
-                #   get work
-                # We also allow for an unskilled_score setting to override.
-                score = self.unskilled_score or self.min_score
+                #   - The skilled workers have all reached their max backlog
+                score = self.unskilled_score
                 best_worker.resume[rclass] = score
                 skilled.add((score, best_worker))
 

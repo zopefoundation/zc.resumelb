@@ -12,7 +12,8 @@ To demonstrate the integration, we'll set up a tree:
     ...   /lb
     ...     /providers
     ...     /workers
-    ...       history=999
+    ...       history = 32
+    ...       max_skill_age = 90
     ...       /providers
     ... """)
 
@@ -72,8 +73,14 @@ soley for testing.
 
 The worker got it's settings from the tree:
 
+    >>> worker.max_skill_age
+    90
+
     >>> worker.history
-    999
+    32
+
+    >>> worker.decay
+    0.96875
 
 It loaded it's resume from resume.mar:
 
@@ -189,7 +196,7 @@ We want to make sure that non-test mode works:
     >>> len(lb.pool.workers)
     2
 
-OK, so let's try a more complex examlpe.  Maybe we can exercise all of
+OK, so let's try a more complex example.  Maybe we can exercise all of
 the options!
 
     >>> server.stop()
@@ -257,8 +264,8 @@ access log.
 By looking at the lb's pool's skilled data structure, we can see that
 the test request classifier was used.
 
-    >>> list(lb.pool.skilled)
-    ['a', 'b', "yup, it's a test"]
+    >>> sorted(lb.pool.skilled)
+    ['a', 'b', 'h1.com', "yup, it's a test"]
 
 Let's shut down the workers:
 
@@ -271,7 +278,6 @@ We see that there are fewer workers:
 
     >>> len(lb.workletts)
     0
-
 
 Not that if we looked at the number of pools, it would still be
 2. This is an artifact of the way the test is run.  We shutdown/killed

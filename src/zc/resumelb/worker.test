@@ -10,9 +10,16 @@ Now, let's create a worker:
     >>> worker = zc.resumelb.worker.Worker(
     ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), history=5)
 
-Here we created a worker using a test application, telling it to
-an address to listen on and to update it's resume after every
+Here we created a worker using a test application, telling it
+an address to listen on and to compute it's resume based on roughly
 five requests.
+
+We could also have specified a max_skill_age parameter, which controls
+how long will keep an unused skill in the resume. It defaults to 10x
+the history:
+
+    >>> worker.max_skill_age
+    50
 
 Note that we passed 0 as the address port. This causes an ephemeral
 port to be used. We can get the actual address using ``worker.addr``.
@@ -179,9 +186,9 @@ The handler for hi.html outputs the url, the pid, the request body
 size and the request body hash.  Note that the hashes match the test
 bodies we created.
 
-We told the worker to use a history of length 5.  This means that it
-will keep track of times for the last 5 requests and compute a new
-resume after 5 requests.  Let's test that by making a 5th request.
+We told the worker to use a history of 5.  This means that it
+will send a new resume to the lb every 5 requests. Let's test that by
+making a 5th request.
 
     >>> write_message(worker_socket, 5, newenv('2', '/sleep.html?dur=.11'), '')
     >>> print_response(worker_socket, 5)
@@ -231,10 +238,10 @@ Open a second connection:
 
     >>> worker_socket2 = gevent.socket.create_connection(worker.addr)
 
-We're immediately send the worker's resume -- same as the old.
+We're immediately send the worker's resume.
 
-    >>> read_message(worker_socket2) == (zero, resume)
-    True
+    >>> read_message(worker_socket2)[0]
+    0
 
 And send simultaneous requests to each connection:
 
@@ -375,8 +382,12 @@ worker will load data from and save data to a file if the
     ...     marshal.dump(dict(a=1.0, b=2.0), f)
 
     >>> worker = zc.resumelb.worker.Worker(
-    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), history=2,
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0),
+    ...   history=2, max_skill_age=3,
     ...   resume_file='resume.mar')
+
+Note that we specified a max_skill_age if 4, rather than the default
+10x the history.
 
     >>> from pprint import pprint
     >>> env = newenv('test', '/hi.html')
@@ -394,12 +405,27 @@ worker will load data from and save data to a file if the
 At this point, the worker should have output a new resume.
 
     >>> rno, resume = read_message(worker_socket)
-    >>> rno, list(resume)
-    (0, ['test'])
+    >>> rno, sorted(resume)
+    (0, ['a', 'b', 'test'])
 
     >>> with open('resume.mar') as f:
-    ...     list(marshal.load(f))
-    ['test']
+    ...     sorted(marshal.load(f))
+    ['a', 'b', 'test']
+
+If we do 2 more requests:
+
+    >>> write_message(worker_socket, 3, env, '')
+    >>> print_response(worker_socket, 3) # doctest: +ELLIPSIS
+    3 200 OK...
+    >>> write_message(worker_socket, 4, env, '')
+    >>> print_response(worker_socket, 4) # doctest: +ELLIPSIS
+    4 200 OK...
+
+We'll get a new resume that ha sdropped the 'a' and 'b' skills:
+
+    >>> rno, resume = read_message(worker_socket)
+    >>> rno, sorted(resume)
+    (0, ['test'])
 
 Ignore empty strings in application iterables
 ---------------------------------------------
@@ -572,3 +598,98 @@ Cleanup:
     >>> logger.removeHandler(handler)
     >>> logger.setLevel(logging.NOTSET)
     >>> worker.stop()
+
+Updating worker settings
+------------------------
+
+Workers have an update_settings method that can be used to update
+settings at run time. It takes a settings dictionary.
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0),
+    ...   history=2)
+
+    >>> worker.history, worker.max_skill_age
+    (2, 20)
+
+    >>> worker.update_settings(dict(history=5))
+    >>> worker.history, worker.max_skill_age
+    (5, 50)
+
+    >>> worker.update_settings(dict(history=5, max_skill_age=9))
+    >>> worker.history, worker.max_skill_age
+    (5, 9)
+
+    >>> worker.update_settings(dict(max_skill_age=99))
+    >>> worker.history, worker.max_skill_age
+    (5, 99)
+
+Resume computation and decay
+----------------------------
+
+Workers keep running totals of how well they do with request classes.
+These totals are decayed using a decay computed from the history.
+
+    >>> .79999 < worker.decay < .8001
+    True
+    >>> worker.update_settings(dict(history=2))
+    >>> worker.decay
+    0.5
+    >>> worker.update_settings(dict(history=1))
+    >>> worker.decay
+    0.0
+
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> read_message(worker_socket)
+    (0, {})
+
+    >>> rno = 0
+    >>> env = newenv('test', '/hi.html')
+    >>> def assert_(cond, mess=None):
+    ...     if not cond:
+    ...         print 'assertion failed', mess
+    >>> def make_request():
+    ...     global rno
+    ...     rno += 1
+    ...     write_message(worker_socket, rno, env, '')
+    ...     assert_(read_message(worker_socket)[0] == rno)
+    ...     assert_(read_message(worker_socket)[0] == rno)
+    ...     assert_(read_message(worker_socket) == (rno, ''))
+
+With a decay of 0, the resume is based on the speed of the previous
+request:
+
+    >>> now = rtime = 1.0
+    >>> def faux_time():
+    ...     global now
+    ...     now += rtime
+    ...     return now
+
+    >>> with mock.patch('time.time') as time:
+    ...     time.side_effect = faux_time
+    ...     make_request()
+
+    >>> read_message(worker_socket)
+    (0, {'test': 1.0})
+
+    >>> rtime = 2.0
+
+    >>> with mock.patch('time.time') as time:
+    ...     time.side_effect = faux_time
+    ...     make_request()
+
+    >>> read_message(worker_socket)
+    (0, {'test': 0.5})
+
+With a decay of .5:
+
+    >>> worker.update_settings(dict(history=2))
+    >>> with mock.patch('time.time') as time:
+    ...     time.side_effect = faux_time
+    ...     rtime = 2.0
+    ...     make_request()
+    ...     rtime = 0.5
+    ...     make_request()
+
+    >>> read_message(worker_socket)
+    (0, {'test': 0.875})

@@ -30,6 +30,9 @@ import zope.testing.renormalizing
 
 pid = os.getpid()
 
+###############################################################################
+# Bobo test app:
+
 @bobo.resource
 def hi(request):
     body = request.environ['wsgi.input'].read()
@@ -64,6 +67,9 @@ def gsleep(dur=0):
 
 def app():
     return bobo.Application(bobo_resources=__name__)
+
+#
+###############################################################################
 
 def test_classifier(env):
     return "yup, it's a test"

@@ -6,15 +6,13 @@ The heart of the resume-based load balancer is the pool, which
 implements the load balancing algorithm.  The pool has a collection of
 workers organized according to their resumes.
 
-The load balancer works by accepting remote worker connections and
-adding local workers to the pool, and by accepting wsgi request,
-getting local workers from the pool and passing the wsgi requests to
-the local workers, which, in term, forwward the requests to the remote
-workers.
+The load balancer works by connecting to workers, creating local
+workers for each connection, adding local workers to the pool, and
+by accepting wsgi request, getting local workers from the pool and
+passing the wsgi requests to the local workers, which, in term,
+forwward the requests to the remote workers.
 
-We'll test the pool with stand-ins for the local workers.  The pool
-constructor takes a settings mapping object.  This allows the settings
-to be managed in real time.
+We'll test the pool with stand-ins for the local workers.
 
     >>> import zc.resumelb.lb
     >>> pool = zc.resumelb.lb.Pool()
@@ -42,10 +40,6 @@ We didn't get a worker (we timed out), because we haven't added one.
     >>> w1 = Worker('w1')
 
     >>> pool.new_resume(w1, {})
-
-As far as the pool is concerned, any object that can be in a set or be
-used as a dictionary key can be used as a worker.  The pool doesn't
-care.  The pool does add some extra attrobutes to workers.
 
    >>> pool.get('foo', 0.0)
    w1
@@ -223,9 +217,6 @@ Pool settings
 
 There are several settings that effect pools:
 
-redundancy
-  Target number of workers for each request class, defaulting to 1.
-
 max_backlog
   Maximum worker backlog, defaulting to 40.
 
@@ -240,123 +231,6 @@ unskilled_score
 We've already seen max_backlog at work.  Let's test the other
 settings.
 
-redundancy
-----------
-
-Given a redundancy, we can compute an expected number of request
-classes per worker (resumne size), which is the number of request
-classes divided by the number of workers times the redundancy.  With
-special handling for no workers or request classes, this works out
-to::
-
-  1 + redundancy * n_request_classes / max(nworkers, 1)
-
-When we get a new resume and it is larger than the expected size, we
-discard half of the excess number of items with the lowest score.
-Given the pool data:
-
-    >>> pool
-    Request classes:
-      bar: w2(2.0,5)
-      foo: w2(2.0,5), w3(3.8,4), w1(6.0,5)
-    Backlogs:
-      4: [w3]
-      5: [w1, w2]
-
-We see there are 2 request classes and 3 workers, so we expect one
-request class per worker.
-
-Let's add a new worker with a much larger resume:
-
-    >>> w4 = Worker('w4')
-    >>> pool.new_resume(w4, dict((str(i), float(i)) for i in range(9)))
-
-When we look at the pool, we see that 4 of the items were discarded:
-
-    >>> pool
-    Request classes:
-      4: w4(4.0,0)
-      5: w4(5.0,0)
-      6: w4(6.0,0)
-      7: w4(7.0,0)
-      8: w4(8.0,0)
-      bar: w2(2.0,5)
-      foo: w2(2.0,5), w3(3.8,4), w1(6.0,5)
-    Backlogs:
-      0: [w4]
-      4: [w3]
-      5: [w1, w2]
-
-Now we have 7 request classes and 4 workers.  If we set redundancy to
-3, then the expected resume size is 6, so::
-
-    >>> pool.redundancy = 3
-    >>> pool.new_resume(w4, dict((str(i), float(i)) for i in range(9)))
-
-    >>> pool
-    Request classes:
-      1: w4(1.0,0)
-      2: w4(2.0,0)
-      3: w4(3.0,0)
-      4: w4(4.0,0)
-      5: w4(5.0,0)
-      6: w4(6.0,0)
-      7: w4(7.0,0)
-      8: w4(8.0,0)
-      bar: w2(2.0,5)
-      foo: w2(2.0,5), w3(3.8,4), w1(6.0,5)
-    Backlogs:
-      0: [w4]
-      4: [w3]
-      5: [w1, w2]
-
-min_score
----------
-
-min_score is mainly provided as a tool to balance work accross
-skills. The algorithm favors giving work to skilled workers.
-If one worker handles a large number of request classes, relative to
-other workers, it might perform sub-optimally, but if load is too low
-to force it to it's maximum backlog, it won't transfer work to other
-workers. min_score provides a tool to help with this.  If a worker has
-a low score and only a modest backlog, it won't be used.
-
-To see this, let's reduce w3's backlog:
-
-    >>> pool.put(w3); pool.put(w3)
-
-but set the min_score to 4:
-
-    >>> pool.min_score = 4.0
-
-And the get a worker for foo:
-
-    >>> pool.get('foo')
-    w4
-    >>> pool
-    Request classes:
-      1: w4(1.0,1)
-      2: w4(2.0,1)
-      3: w4(3.0,1)
-      4: w4(4.0,1)
-      5: w4(5.0,1)
-      6: w4(6.0,1)
-      7: w4(7.0,1)
-      8: w4(8.0,1)
-      bar: w2(2.0,5)
-      foo: w2(2.0,5), w3(3.8,2), w4(4.0,1), w1(6.0,5)
-    Backlogs:
-      1: [w4]
-      2: [w3]
-      5: [w1, w2]
-
-We get the unskilled w4 because w1 and w2 are at their maximum
-backlogs, and w3 has a backloh of 2 and a score of only 3.8.
-
-Note that w4 is assigned a skill for foo of 4, which is min_score.
-
-XXX It's unclear if min_score provides much, if any, benefit.
-
 Worker disconnect
 =================
 
@@ -366,16 +240,7 @@ When a worker disconnect, it's removed from the pool:
     >>> pool.remove(w3)
     >>> pool
     Request classes:
-      1: w4(1.0,1)
-      2: w4(2.0,1)
-      3: w4(3.0,1)
-      4: w4(4.0,1)
-      5: w4(5.0,1)
-      6: w4(6.0,1)
-      7: w4(7.0,1)
-      8: w4(8.0,1)
       bar: w2(2.0,5)
-      foo: w2(2.0,5), w4(4.0,1)
+      foo: w2(2.0,5)
     Backlogs:
-      1: [w4]
       5: [w2]

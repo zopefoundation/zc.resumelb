@@ -24,12 +24,16 @@ def error(mess):
 
 class Worker:
 
-    def __init__(self, app, addr, history=999,
+    def __init__(self, app, addr,
+                 history=9999, max_skill_age=None,
                  resume_file=None, threads=None, tracelog=None):
         self.app = app
         self.history = history
-        self.worker_request_number = 0
+        self.max_skill_age = max_skill_age or history * 10
+        self.decay = 1.0-1.0/history
         self.resume_file = resume_file
+        self.perf_data = {} # rclass -> (gen, decayed times, decayed counts)
+        self.generation = 0
         self.resume = {}
         if self.resume_file and os.path.exists(self.resume_file):
             try:
@@ -37,8 +41,11 @@ class Worker:
                     self.resume = marshal.load(f)
             except Exception:
                 logger.exception('reading resume file')
-        self.time_ring = []
-        self.time_ring_pos = 0
+            else:
+                for rclass, rpm in self.resume.iteritems():
+                    if rpm > 0:
+                        self.perf_data[rclass] = 0, 1.0/rpm, history
+
         self.connections = set()
 
         if threads:
@@ -109,6 +116,11 @@ class Worker:
     def update_settings(self, data):
         if 'history' in data:
             self.history = data['history']
+            if 'max_skill_age' not in data:
+                self.max_skill_age = self.history * 10
+        if 'max_skill_age' in data:
+            self.max_skill_age = data['max_skill_age']
+        self.decay = 1 - 1.0/self.history
 
     def stop(self):
         self.server.stop()
@@ -182,31 +194,34 @@ class Worker:
 
                 conn.put((rno, ''))
 
+                # Update resume
                 elapsed = max(time.time() - env['zc.resumelb.time'], 1e-9)
-                time_ring = self.time_ring
-                time_ring_pos = rno % self.history
                 rclass = env['zc.resumelb.request_class']
-                try:
-                    time_ring[time_ring_pos] = rclass, elapsed
-                except IndexError:
-                    while len(time_ring) <= time_ring_pos:
-                        time_ring.append((rclass, elapsed))
+                generation = self.generation + 1
+                perf_data = self.perf_data.get(rclass)
+                if perf_data:
+                    rgen, rtime, rcount = perf_data
+                else:
+                    rgen = generation
+                    rtime = rcount = 0
 
-                worker_request_number = self.worker_request_number + 1
-                self.worker_request_number = worker_request_number
-                if worker_request_number % self.history == 0:
-                    byrclass = {}
-                    for rclass, elapsed in time_ring:
-                        sumn = byrclass.get(rclass)
-                        if sumn:
-                            sumn[0] += elapsed
-                            sumn[1] += 1
-                        else:
-                            byrclass[rclass] = [elapsed, 1]
-                    self.new_resume(dict(
-                        (rclass, n/sum)
-                        for (rclass, (sum, n)) in byrclass.iteritems()
-                        ))
+                decay = self.decay ** (generation - rgen)
+                rgen = generation
+                rtime = rtime * decay + elapsed
+                rcount = rcount * decay + 1
+
+                self.generation = generation
+                self.perf_data[rclass] = rgen, rtime, rcount
+                self.resume[rclass] = rcount / rtime
+
+                if generation % self.history == 0:
+                    min_gen = generation - self.max_skill_age
+                    for rclass in [r for (r, d) in self.perf_data.iteritems()
+                                   if d[0] < min_gen]:
+                        del self.perf_data[rclass]
+                        del self.resume[rclass]
+
+                    self.new_resume(self.resume)
 
             except zc.resumelb.util.Disconnected:
                 return # whatever
