@@ -25,6 +25,7 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
            threads=None, backdoor=False, run=True, **kw):
     """Paste deploy server runner
     """
+    # XXX support log level
     if loggers:
         import ZConfig
         ZConfig.configureLoggers(loggers)
@@ -123,6 +124,7 @@ def lbmain(args=None, run=True):
         else:
             return
 
+    # XXX default to basic config?
     if options.logger_configuration:
         import ZConfig
         with open(options.logger_configuration) as f:

@@ -87,19 +87,34 @@ class LB:
 
 class Pool:
 
-    def __init__(self, max_backlog=40, unskilled_score=1.0):
-        self.max_backlog = max_backlog
+    def __init__(self, unskilled_score=1.0, variance=4.0, backlog_history=9):
         self.unskilled_score = unskilled_score
+        self.variance = variance
+        self.backlog_history = backlog_history
+        self._update_worker_decay()
 
         self.workers = set()
+        self.nworkers = 0
         self.unskilled = llist.dllist()
         self.skilled = {}   # rclass -> {[(score, workers)]}
         self.event = gevent.event.Event()
+        _init_backlog(self)
 
     def update_settings(self, settings):
-        for name in ('max_backlog', 'unskilled_score'):
+        for name in ('unskilled_score', 'variance', 'backlog_history'):
             if name in settings:
                 setattr(self, name, settings[name])
+
+        if 'backlog_history' in settings:
+            self._update_worker_decay()
+            self._update_decay()
+
+    def _update_decay(self):
+        if self.nworkers:
+            self.decay = 1.0 - 1.0/(self.backlog_history*2*self.nworkers)
+
+    def _update_worker_decay(self):
+        self.worker_decay = 1.0 - 1.0/(self.backlog_history*2)
 
     def __repr__(self):
         outl = []
@@ -110,11 +125,15 @@ class Pool:
                 % (rclass,
                    ', '.join(
                        '%s(%s,%s)' %
-                       (worker, score, worker.backlog)
+                       (worker, score, worker.mbacklog)
                        for (score, worker) in sorted(skilled)
                    ))
                 )
         out('Backlogs:')
+        out("  overall backlog: %s Decayed: %s Avg: %s" % (
+            self.backlog, self.mbacklog,
+            (self.mbacklog / self.nworkers) if self.nworkers else None
+            ))
         backlogs = {}
         for worker in self.workers:
             backlogs.setdefault(worker.backlog, []).append(worker)
@@ -122,24 +141,20 @@ class Pool:
             out('  %s: %r' % (backlog, sorted(workers)))
         return '\n'.join(outl)
 
-    def new_resume(self, worker, resume=None):
+    def new_resume(self, worker, resume):
         skilled = self.skilled
-        unskilled = self.unskilled
         workers = self.workers
 
         if worker in workers:
             for rclass, score in worker.resume.iteritems():
                 skilled[rclass].remove((score, worker))
-            if resume is None:
-                workers.remove(worker)
-                if worker.lnode is not None:
-                    unskilled.remove(worker.lnode)
-                    worker.lnode = None
-                return
         else:
-            worker.backlog = 0
+            _init_backlog(worker)
             workers.add(worker)
-            worker.lnode = unskilled.appendleft(worker)
+            self.nworkers = len(self.workers)
+            self._update_decay()
+            worker.lnode = self.unskilled.appendleft(worker)
+            self.event.set()
 
         worker.resume = resume
         for rclass, score in resume.iteritems():
@@ -148,11 +163,21 @@ class Pool:
             except KeyError:
                 skilled[rclass] = set(((score, worker), ))
 
-        if unskilled:
-            self.event.set()
+        logger.info('new resume\n%s', self)
 
     def remove(self, worker):
-        self.new_resume(worker)
+        skilled = self.skilled
+        for rclass, score in worker.resume.iteritems():
+            skilled[rclass].remove((score, worker))
+        if getattr(worker, 'lnode', None) is not None:
+            self.unskilled.remove(worker.lnode)
+            worker.lnode = None
+        self.workers.remove(worker)
+        self.nworkers = len(self.workers)
+        if self.nworkers:
+            self._update_decay()
+        else:
+            self.event.clear()
 
     def get(self, rclass, timeout=None):
         """Get a worker to handle a request class
@@ -164,60 +189,58 @@ class Pool:
                 return None
 
         # Look for a skilled worker
-        max_backlog = self.max_backlog
         best_score = 0
         best_worker = None
         skilled = self.skilled.get(rclass)
         if skilled is None:
             skilled = self.skilled[rclass] = set()
+
+        max_backlog = self.variance * max(self.mbacklog / self.nworkers, 2)
         for score, worker in skilled:
-            backlog = worker.backlog + 1
-            if backlog > max_backlog:
+            if worker.mbacklog > max_backlog:
                 continue
+            backlog = worker.backlog + 1
             score /= backlog
             if (score > best_score):
                 best_score = score
                 best_worker = worker
 
         if not best_score:
-            while unskilled.first.value.backlog >= max_backlog:
-                # Edge case.  max_backlog was reduced after a worker
-                # with a larger backlog was added.
-                #import pdb; pdb.set_trace()
-                unskilled.first.value.lnode = None
-                unskilled.popleft()
-                if not unskilled:
-                    # OK, now we need to wait. Just start over.
-                    return self.get(rclass, timeout)
-
             best_worker = unskilled.first.value
             if rclass not in best_worker.resume:
-
                 # We now have an unskilled worker and we need to
                 # assign it a score.
-                # - We want to give it work somewhat gradually.
-                # - We got here because:
-                #   - there are no skilled workers,
-                #   - The skilled workers have all reached their max backlog
                 score = self.unskilled_score
                 best_worker.resume[rclass] = score
                 skilled.add((score, best_worker))
 
+        # Move worker from lru to mru end of queue
         unskilled.remove(best_worker.lnode)
+        best_worker.lnode = unskilled.append(best_worker)
+
         best_worker.backlog += 1
-        if best_worker.backlog < max_backlog:
-            best_worker.lnode = unskilled.append(best_worker)
-        else:
-            best_worker.lnode = None
+        _decay_backlog(best_worker, self.worker_decay)
+
+        self.backlog += 1
+        _decay_backlog(self, self.decay)
 
         return best_worker
 
     def put(self, worker):
-        if worker.lnode is None:
-            worker.lnode = self.unskilled.append(worker)
-            self.event.set()
-        if worker.backlog:
+        self.backlog -= 1
+        assert self.backlog >= 0, self.backlog
+        _decay_backlog(self, self.decay)
+        if worker.backlog > 0:
             worker.backlog -= 1
+            _decay_backlog(worker, self.worker_decay)
+
+def _init_backlog(worker):
+    worker.backlog = worker.nbacklog = worker.dbacklog = worker.mbacklog = 0
+
+def _decay_backlog(worker, decay):
+    worker.dbacklog = worker.dbacklog*decay + worker.backlog
+    worker.nbacklog = worker.nbacklog*decay + 1
+    worker.mbacklog = worker.dbacklog / worker.nbacklog
 
 class Worker(zc.resumelb.util.Worker):
 

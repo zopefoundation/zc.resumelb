@@ -15,7 +15,26 @@ forwward the requests to the remote workers.
 We'll test the pool with stand-ins for the local workers.
 
     >>> import zc.resumelb.lb
-    >>> pool = zc.resumelb.lb.Pool()
+    >>> pool = zc.resumelb.lb.Pool(
+    ...     variance=2, backlog_history=2, unskilled_score=.5)
+
+We specified a number of optional paramters that we'll see in action
+later:
+
+variance
+   How many times the pool mean backlog we'll ket a worker's backlog
+   rise before we look for another worker. The default is 4.
+
+backlog_history
+   The (aproximate) number of requests to include in the mean backlog
+   for a worker. The default is 9.
+
+   The pool also has a backlog history, which is the product of the
+   worker backlog_history and the number of workers.
+
+unskilled_score
+   The score to assign to unsklilled workers. The default is 1.
+
 
 The get method is used to get a worker from the pool.  A request class
 and an optional timeout is passed. (The timeout is mainly useful for
@@ -64,19 +83,23 @@ If we create another and register it, we'll still get the original:
  We're gonna be white box and look at the pool data structures from
  time to time.
 
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(1.0,1)
-      foo: w1(1.0,2)
+      bar: w2(0.5,1.0)
+      foo: w1(0.5,1.57...)
     Backlogs:
+      overall backlog: 3 Decayed: 2.08... Avg: 1.04...
       1: [w2]
       2: [w1]
 
 Here, we can see that w1 is used for the foo class and w2 for the bar
-class.  In the request classes, the worker's score and it's overall
-backlog if shown in paretheses.  We see that both workers have a score
+class.  In the request classes, the worker's score and it's decayed
+backlog is shown in paretheses.  We see that both workers have a score
 of 1.0.  This is the default score for new workers.  We'll say more
 about this later.
+
+The decayed backlog, for the pool, and for workers, is an "average"
+backlog over a backlog history, which is a configation parameter.
 
 Let's add another worker:
 
@@ -85,114 +108,133 @@ Let's add another worker:
 
 and make some more foo requests:
 
-    >>> [pool.get('foo') for i in range(3)]
-    [w1, w1, w1]
+    >>> [pool.get('foo') for i in range(4)]
+    [w1, w1, w1, w1]
 
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(1.0,1)
-      foo: w1(1.0,5)
+      bar: w2(0.5,1.0)
+      foo: w1(0.5,4.29907929908)
     Backlogs:
+      overall backlog: 7 Decayed: 4.39137888071 Avg: 1.46379296024
       0: [w3]
       1: [w2]
-      5: [w1]
+      6: [w1]
 
 Even though we still had a worker with no backlog, we kept sending
-requests to w1.  This is because w1 hasn't reached it's maximum
-backlog.  Also, it's score is greater than the min score, which
-defaults to 1.0.  Let's reduce the maximum backlog to 5:
+requests to w1.  This is because w1 hasn't reached the maximum
+backlog, which is:
 
-    >>> pool.max_backlog = 5
+   variance * max(2, pool_mean_backlog)
 
 So now, w1 has reached it's maximum backlog.  If
-we make another foo request, we'll start using w3, and when that's
-reached it's maximum backlog, we'll start using w2:
+we make another foo request, we'll start using w3:
 
-    >>> [pool.get('foo') for i in range(7)]
-    [w3, w3, w3, w3, w3, w2, w2]
+    >>> [pool.get('foo') for i in range(10)]
+    [w3, w3, w3, w3, w3, w3, w1, w3, w1, w3]
 
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(1.0,3)
-      foo: w1(1.0,5), w2(1.0,3), w3(1.0,5)
+      bar: w2(0.5,1.0)
+      foo: w1(0.5,5.89000423908), w3(0.5,5.89000423908)
     Backlogs:
-      3: [w2]
-      5: [w1, w3]
+      overall backlog: 17 Decayed: 11.0516220545 Avg: 3.68387401818
+      1: [w2]
+      8: [w1, w3]
 
-If we get all workers to the maximum backlog, we'll block until a
-worker is free.
+Something interesting heppened here.  After several requests, the
+pools switched back and forth between w1 and w3.  It never switched to
+w2.  This is because, as the backlogs for w2 and w2 increased, so did
+the mean backlog.  This is useful, because it prevents a single
+request class from taking over the entire pool.  Let's see what
+happens when we add some new workers:
+
+    >>> w4 = Worker('w4')
+    >>> pool.new_resume(w4, {})
+    >>> w5 = Worker('w5')
+    >>> pool.new_resume(w5, {})
+
+    >>> pool # doctest: +ELLIPSIS
+    Request classes:
+      bar: w2(0.5,1.0)
+      foo: w1(0.5,5.89000423908), w3(0.5,5.89000423908)
+    Backlogs:
+      overall backlog: 17 Decayed: 11.0516220545 Avg: 2.21032441091
+      0: [w4, w5]
+      1: [w2]
+      8: [w1, w3]
 
     >>> [pool.get('foo') for i in range(2)]
-    [w2, w2]
+    [w5, w5]
 
-    >>> pool.get('foo', 0.0)
+The new workers caused the overall mean to drop and when we got a foo
+request, it went to the newest new worker.  The subsequent request
+went to that worker because it was skilled and had a fairly low backlog.
 
 When a worker is done doing it's work, we put it back in the pool:
 
-    >>> pool.put(w1)
-    >>> pool.put(w1)
-    >>> pool.put(w1)
-    >>> pool.put(w2)
-    >>> pool.put(w3)
-    >>> pool.put(w3)
-    >>> pool
+    >>> for i in range(8):
+    ...     pool.put(w1)
+    >>> for i in range(8):
+    ...     pool.put(w3)
+
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(1.0,4)
-      foo: w1(1.0,2), w2(1.0,4), w3(1.0,3)
+      bar: w2(0.5,1.0)
+      foo: w1(0.5,2.45398560273), w3(0.5,2.45398560273), w5(0.5,1.57142857143)
     Backlogs:
-      2: [w1]
-      3: [w3]
-      4: [w2]
+      overall backlog: 3 Decayed: 10.2983868199 Avg: 2.05967736397
+      0: [w1, w3, w4]
+      1: [w2]
+      2: [w5]
 
 Now, when we get a worker, we'll get w1.
 
     >>> pool.get('foo', 0.0)
     w1
 
-Why? We adjust each score by the worker's backlog, so even though all
-2 workers had the same score, w1 is chosen because it has the smallest
-backlog.
-
 Now that we've done some work, let's update the resumes.  This will
 normally be done by workers periodically, after collecting performance
 data.
 
     >>> pool.new_resume(w1, {'foo': 6.0})
-
     >>> pool.new_resume(w2, {'bar': 2.0, 'foo': 2.0})
-
     >>> pool.new_resume(w3, {'foo': 3.8})
 
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(2.0,4)
-      foo: w2(2.0,4), w3(3.8,3), w1(6.0,3)
+      bar: w2(2.0,1.0)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.45...), w1(6.0,2.08...)
     Backlogs:
-      3: [w1, w3]
-      4: [w2]
+      overall backlog: 4 Decayed: 9.90317056202 Avg: 1.9806341124
+      0: [w3, w4]
+      1: [w1, w2]
+      2: [w5]
 
+    >>> pool.get('foo')
+    w3
     >>> pool.get('foo')
     w1
     >>> pool.get('foo')
     w1
 
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(2.0,4)
-      foo: w2(2.0,4), w3(3.8,3), w1(6.0,5)
+      bar: w2(2.0,1.0)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.08...), w1(6.0,2.30...)
     Backlogs:
-      3: [w3]
-      4: [w2]
-      5: [w1]
-
-Because w1 has reached the maximum backlog, it's out of the running.
+      overall backlog: 7 Decayed: 9.23495653237 Avg: 1.84699130647
+      0: [w4]
+      1: [w2, w3]
+      2: [w5]
+      3: [w1]
 
     >>> pool.get('foo')
     w3
     >>> pool.get('foo')
-    w3
+    w1
     >>> pool.get('foo')
-    w2
+    w3
 
     >>> pool.put(w1)
     >>> pool.put(w3)
@@ -200,36 +242,19 @@ Because w1 has reached the maximum backlog, it's out of the running.
     >>> pool.put(w3)
     >>> pool.put(w3)
     >>> pool.put(w3)
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(2.0,5)
-      foo: w2(2.0,5), w3(3.8,0), w1(6.0,4)
+      bar: w2(2.0,1.0)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,1.43...), w1(6.0,2.79...)
     Backlogs:
-      0: [w3]
-      4: [w1]
-      5: [w2]
+      overall backlog: 4 Decayed: 8.35... Avg: 1.67...
+      0: [w3, w4]
+      1: [w2]
+      2: [w5]
+      3: [w1]
 
     >>> [pool.get('foo') for i in range(5)]
-    [w3, w3, w3, w1, w3]
-
-Pool settings
-=============
-
-There are several settings that effect pools:
-
-max_backlog
-  Maximum worker backlog, defaulting to 40.
-
-min_score
-  A worker won't be used if it has a backlog greater than 1 and it's
-  score is less than min_score.
-
-unskilled_score
-  The score assigned to workers when given a new request class.  This
-  defaults to min_score.
-
-We've already seen max_backlog at work.  Let's test the other
-settings.
+    [w3, w3, w1, w3, w1]
 
 Worker disconnect
 =================
@@ -238,9 +263,37 @@ When a worker disconnect, it's removed from the pool:
 
     >>> pool.remove(w1)
     >>> pool.remove(w3)
-    >>> pool
+    >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(2.0,5)
-      foo: w2(2.0,5)
+      bar: w2(2.0,1.0)
+      foo: w5(0.5,1.57142857143), w2(2.0,1.0)
     Backlogs:
-      5: [w2]
+      overall backlog: 9 Decayed: 8.043843598 Avg: 2.68128119933
+      0: [w4]
+      1: [w2]
+      2: [w5]
+
+Updating worker settings
+========================
+
+    >>> pool = zc.resumelb.lb.Pool()
+    >>> pool.new_resume(w1, {'foo': 6.0})
+    >>> pool.new_resume(w2, {'bar': 2.0, 'foo': 2.0})
+    >>> pool.new_resume(w3, {'foo': 3.8})
+    >>> pool.variance, pool.backlog_history, pool.unskilled_score
+    (4.0, 9, 1.0)
+    >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
+    (0.944..., 0.981...)
+
+    >>> pool.update_settings(dict(variance=2.0))
+    >>> pool.variance, pool.backlog_history, pool.unskilled_score
+    (2.0, 9, 1.0)
+    >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
+    (0.944..., 0.981...)
+
+    >>> pool.update_settings(
+    ... dict(variance=3.0, backlog_history=6, unskilled_score=.25))
+    >>> pool.variance, pool.backlog_history, pool.unskilled_score
+    (3.0, 6, 0.25)
+    >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
+    (0.916..., 0.972...)
