@@ -92,7 +92,11 @@ def zkTearDown(test):
 def test_suite():
     return unittest.TestSuite((
         manuel.testing.TestSuite(
-            manuel.doctest.Manuel() + manuel.capture.Manuel(),
+            manuel.doctest.Manuel(
+                checker = zope.testing.renormalizing.OutputChecker([
+                    (re.compile(r'127.0.0.1:\d+'), '127.0.0.1:0'),
+                    ])
+                ) + manuel.capture.Manuel(),
             'lb.test', 'pool.test', 'worker.test',
             setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
         manuel.testing.TestSuite(

@@ -206,6 +206,19 @@ should all be 0:
     >>> sum(worker.backlog for worker in lb.pool.workers)
     0
 
+Worker reprs
+============
+
+Workers use their addresses as their reprs.
+
+    >>> print lb.pool
+    Request classes:
+      h1.com: 127.0.0.1:65027(10.0,0)
+      h2.com: 127.0.0.1:65028(10.0,0)
+    Backlogs:
+      0: [127.0.0.1:65028, 127.0.0.1:65027]
+
+
 Worker disconnection
 ====================
 

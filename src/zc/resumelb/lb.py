@@ -226,6 +226,7 @@ class Worker(zc.resumelb.util.Worker):
     def __init__(self, pool, socket, addr):
         self.pool = pool
         self.nrequest = 0
+        self.__name__ = '%s:%s' % addr
 
         readers = self.connected(socket, addr)
 
@@ -242,7 +243,7 @@ class Worker(zc.resumelb.util.Worker):
                 readers[rno](data)
 
     def __repr__(self):
-        return "worker-%s" % id(self)
+        return self.__name__
 
     def handle(self, rclass, env, start_response):
         logger.debug('handled by %s', self.addr)
