@@ -93,7 +93,7 @@ class Pool:
 
         self.workers = set()
         self.unskilled = llist.dllist()
-        self.skilled = {}   # rclass -> {(score, workers)}
+        self.skilled = {}   # rclass -> {[(score, workers)]}
         self.event = gevent.event.Event()
 
     def update_settings(self, settings):
