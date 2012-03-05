@@ -26,7 +26,6 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
            threads=None, backdoor=False, run=True, **kw):
     """Paste deploy server runner
     """
-    # XXX support log level
     if loggers:
         if re.match(r'\d+$', loggers):
             logging.basicConfig(level=int(loggers))
@@ -130,7 +129,6 @@ def lbmain(args=None, run=True):
         else:
             return
 
-    # XXX default to basic config?
     if options.logger_configuration:
         logger_config = options.logger_configuration
         if re.match(r'\d+$', logger_config):
