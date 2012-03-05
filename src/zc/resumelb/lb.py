@@ -5,6 +5,7 @@ import gevent.pywsgi
 import gevent.socket
 import llist
 import logging
+import re
 import sys
 import webob
 import zc.resumelb.util
@@ -335,6 +336,19 @@ def host_classifier(env):
     if host.startswith('www.'):
         return host[4:]
     return host
+
+def re_classifier(name, regex):
+    search = re.compile(regex).search
+
+    def classifier(env):
+        value = env.get(name)
+        if value is not None:
+            match = search(value)
+            if match:
+                return match.group('class')
+        return ''
+
+    return classifier
 
 def main(args=None):
     if args is None:

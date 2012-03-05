@@ -437,3 +437,20 @@ The zc.resume.lb module has a host-based request classifier:
 
     >>> zc.resumelb.lb.host_classifier(dict(HTTP_HOST='www.example.com'))
     'example.com'
+
+A more general classifier is the re_classifier.  It is a classifier
+factory that takes a environment name and a regular expression.  The
+regular expression must define a group named 'class':
+
+    >>> classifier = zc.resumelb.lb.re_classifier(
+    ...    'PATH_INFO', r'^/(?P<class>[^/]*)')
+    >>> classifier(dict(PATH_INFO=''))
+    ''
+    >>> classifier({})
+    ''
+    >>> classifier(dict(PATH_INFO='/'))
+    ''
+    >>> classifier(dict(PATH_INFO='/foo'))
+    'foo'
+    >>> classifier(dict(PATH_INFO='/foo/bar/baz'))
+    'foo'
