@@ -333,7 +333,10 @@ def parse_addr(addr):
     return host, int(port)
 
 def host_classifier(env):
-    return env.get("HTTP_HOST", '')
+    host = env.get("HTTP_HOST", '')
+    if host.startswith('www.'):
+        return host[4:]
+    return host
 
 def main(args=None):
     if args is None:

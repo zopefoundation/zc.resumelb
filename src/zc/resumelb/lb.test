@@ -415,3 +415,14 @@ have gone away.
 Cleanup:
 
     >>> lb.stop()
+
+Built-in request classifiers
+============================
+
+The zc.resume.lb module has a host-based request classifier:
+
+    >>> zc.resumelb.lb.host_classifier(dict(HTTP_HOST='example.com'))
+    'example.com'
+
+    >>> zc.resumelb.lb.host_classifier(dict(HTTP_HOST='www.example.com'))
+    'example.com'
