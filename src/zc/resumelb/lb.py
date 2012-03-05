@@ -72,8 +72,6 @@ class LB:
                 self.pool.put(worker)
                 return result
             except zc.resumelb.util.Disconnected:
-                # XXX need to be more careful about whether
-                # start_response was called.
                 if (int(env.get('CONTENT_LENGTH', 0)) == 0 and
                     env.get('REQUEST_METHOD') in retry_methods
                     ):
@@ -315,9 +313,9 @@ class Worker(zc.resumelb.util.Worker):
                     if data:
                         logger.debug('yield %r', data)
                         yield data
-                    elif data is None:
-                        raise zc.resumelb.util.Disconnected()
                     else:
+                        if data is None:
+                            logger.warning('Disconnected while returning body')
                         break
             finally:
                 self.end(rno)

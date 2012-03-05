@@ -239,8 +239,11 @@ When a worker disconnects from a running lb, any pending GET or HEAD
 requests are resubmitted to another worker. All other requests
 generate a 500 response.
 
+Also, if a worker has already sent part of the response and
+disconnects, that response is simply truncated.
+
     >>> greenlets = []
-    >>> for method in ('GET', 'HEAD', 'PUT', 'POST', 'DELETE',
+    >>> for method in ('GET', 'GET', 'HEAD', 'PUT', 'POST', 'DELETE',
     ...                'OPTIONS', 'TRACE'):
     ...     app = webtest.TestApp(lb.handle_wsgi)
     ...     greenlets.append(
@@ -258,12 +261,19 @@ generate a 500 response.
     7 <type 'dict'>
     8 <type 'dict'>
     9 <type 'dict'>
+    10 <type 'dict'>
+
+Now, let's send a partial response from the first GET:
+
+    >>> write_message(worker1, 3, ('200 OK', [
+    ...   ('Content-Length', '42'), ('Content-Type', 'text/html')]))
+    >>> gevent.sleep(.01)
 
 Now, we'll disconnect worker1:
 
     >>> worker1.close()
 
-The GET and HEAD request will be send to worker2:
+The second GET and the HEAD request will be send to worker2:
 
     >>> rno1, env1 = read_message(worker2)
     >>> rno, blank = read_message(worker2)
@@ -289,6 +299,7 @@ The GET and HEAD request will be send to worker2:
     >>> for g in greenlets:
     ...    g.join()
     ...    print repr(g.value)
+    <200 OK text/html no body>
     <200 OK text/html body='Hello test\n'>
     <200 OK text/html no body>
     <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
@@ -297,7 +308,7 @@ The GET and HEAD request will be send to worker2:
     <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
     <502 Bad Gateway text/html body='\n<html><...l>\n'/159>
 
-    >>> print greenlets[2].value.body
+    >>> print greenlets[3].value.body
     <BLANKLINE>
     <html><meta http-equiv="refresh" content="1"><body>
     The server was unable to handle your request due to a transient failure.
@@ -401,7 +412,7 @@ being reconnected if it disconnects in it's own.
     >>> len(lb.pool.workers)
     2
 
-Because the lb didn't reconnect, out's socket is till the one from
+Because the lb didn't reconnect, our's socket is till the one from
 before that we closed:
 
     >>> out.socket is outsocket
