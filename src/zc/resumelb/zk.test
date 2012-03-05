@@ -337,10 +337,11 @@ OK. now let's shut down the server and lb.
 
 Finally, let's test that:
 
-- The server runs in non-test mode and that
+- The server runs in non-test mode, that
 
-- We can pass an object as the access log parameter.
-  (Used by simulation script.)
+- we can pass an object as the access log parameter (used by
+  simulation script.), and that we can pass basoc logging information:
+
 
     >>> worker_greenlet = gevent.spawn(zc.resumelb.zk.worker,
     ...     app, None,
@@ -350,10 +351,14 @@ Finally, let's test that:
     >>> import StringIO
     >>> accesslog = StringIO.StringIO()
 
-    >>> lb_greenlet = gevent.spawn(zc.resumelb.zk.lbmain, [
-    ...     '-a127.0.0.1:0',
-    ...     '-l', accesslog, 'zookeeper.example.com:2181', '/test/lb'])
-    >>> gevent.sleep(.1)
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     lb_greenlet = gevent.spawn(zc.resumelb.zk.lbmain, [
+    ...       '-a127.0.0.1:0', '--logger-configuration', 'INFO',
+    ...       '-l', accesslog, 'zookeeper.example.com:2181', '/test/lb'])
+    ...     gevent.sleep(.1)
+    ...     if configureLoggers.called: print 'configureLoggers'
+    ...     basicConfig.assert_called_with(level=20)
 
     >>> [addr] = map(zc.parse_addr.parse_addr,
     ...              zk.get_children('/test/lb/providers'))
@@ -368,3 +373,20 @@ Finally, let's test that:
 
     >>> print accesslog.getvalue(),
     127.0.0.1 - - [2012-01-31 07:46:31] "GET /hi.html HTTP/1.0" 200 226 0.001165
+
+    >>> server.stop()
+    >>> lb.stop()
+
+Try a numeric log level:
+
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     lb_greenlet = gevent.spawn(zc.resumelb.zk.lbmain, [
+    ...       '-a127.0.0.1:0', '--logger-configuration', '42',
+    ...       '-l', accesslog, 'zookeeper.example.com:2181', '/test/lb'])
+    ...     gevent.sleep(.1)
+    ...     if configureLoggers.called: print 'configureLoggers'
+    ...     basicConfig.assert_called_with(level=42)
+
+    >>> server.stop()
+    >>> lb.stop()

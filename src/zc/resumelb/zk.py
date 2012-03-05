@@ -132,10 +132,15 @@ def lbmain(args=None, run=True):
 
     # XXX default to basic config?
     if options.logger_configuration:
-        import ZConfig
-        with open(options.logger_configuration) as f:
-            ZConfig.configureLoggers(f.read())
-
+        logger_config = options.logger_configuration
+        if re.match(r'\d+$', logger_config):
+            logging.basicConfig(level=int(logger_config))
+        elif logger_config in ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'):
+            logging.basicConfig(level=getattr(logging, logger_config))
+        else:
+            import ZConfig
+            with open(logger_config) as f:
+                ZConfig.configureLoggers(f.read())
 
     zk = zc.zk.ZooKeeper(zookeeper)
     addrs = zk.children(path+'/workers/providers')
