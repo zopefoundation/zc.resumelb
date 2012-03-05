@@ -50,7 +50,7 @@ address
   This defaults to ":0", to bind to a dynamic port on all IPv4 addresses.
 
 loggers
-  A ZConfig loggers-definition string
+  A ZConfig loggers-definition string, or a log-level
 
 Let's create a worker, making sure that ZConfig.configureLoggers was called.
 
@@ -59,6 +59,7 @@ Let's create a worker, making sure that ZConfig.configureLoggers was called.
     >>> with open('resume.mar', 'w') as f:
     ...     marshal.dump(dict(a=1.0, b=2.0), f)
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
     ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
@@ -66,6 +67,7 @@ Let's create a worker, making sure that ZConfig.configureLoggers was called.
     ...         resume_file='resume.mar',
     ...         )
     ...     configureLoggers.assert_called_with('loggers')
+    ...     if basicConfig.called: print 'basicConfig'
 
 Normally, when used with paste, the worker function runs forever.  We
 passed the run argument with a false value. The run argument exists
@@ -98,6 +100,49 @@ subnode of the given path:
     >>> meta = zk.get('/test/lb/workers/providers/' + waddr)[1]
     >>> bool(meta['ephemeralOwner'])
     True
+
+Let's try again, but this time, don't set up logging:
+
+    >>> worker.stop(); worker.zk.close()
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     worker = zc.resumelb.zk.worker(
+    ...         app, None,
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         address='127.0.0.1:0', run=False,
+    ...         resume_file='resume.mar',
+    ...         )
+    ...     if configureLoggers.called: print 'configureLoggers'
+    ...     if basicConfig.called: print 'basicConfig'
+
+Let's try again, but this time, set up basic logging:
+
+    >>> worker.stop(); worker.zk.close()
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     worker = zc.resumelb.zk.worker(
+    ...         app, None,
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         address='127.0.0.1:0', run=False, loggers='INFO',
+    ...         resume_file='resume.mar',
+    ...         )
+    ...     if configureLoggers.called: print 'configureLoggers'
+    ...     basicConfig.assert_called_with(level=20)
+
+Let's try again, but this time, set up basic logging with a numeric level:
+
+    >>> worker.stop(); worker.zk.close()
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     worker = zc.resumelb.zk.worker(
+    ...         app, None,
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         address='127.0.0.1:0', run=False, loggers='42',
+    ...         resume_file='resume.mar',
+    ...         )
+    ...     if configureLoggers.called: print 'configureLoggers'
+    ...     basicConfig.assert_called_with(level=42)
+
 
 LB
 ==

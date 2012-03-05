@@ -17,6 +17,7 @@ import gevent
 import gevent.pool
 import logging
 import os
+import re
 import sys
 import zc.parse_addr
 import zc.zk
@@ -27,8 +28,13 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
     """
     # XXX support log level
     if loggers:
-        import ZConfig
-        ZConfig.configureLoggers(loggers)
+        if re.match(r'\d+$', loggers):
+            logging.basicConfig(level=int(loggers))
+        elif loggers in ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'):
+            logging.basicConfig(level=getattr(logging, loggers))
+        else:
+            import ZConfig
+            ZConfig.configureLoggers(loggers)
 
     zk = zc.zk.ZooKeeper(zookeeper)
     address = zc.parse_addr.parse_addr(address)
