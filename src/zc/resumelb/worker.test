@@ -11,7 +11,7 @@ Now, let's create a worker:
     ...   zc.resumelb.tests.app(), ('127.0.0.1', 0), history=5)
 
 Here we created a worker using a test application, telling it
-an address to listen on and to compute it's resume based on roughly
+an address to listen on and to compute its resume based on roughly
 five requests.
 
 We could also have specified a max_skill_age parameter, which controls
@@ -35,13 +35,13 @@ Each message consists of binary request numbers, data size and a
 marshalled data string.  Helper functions help us read and write
 messages.  When workers accept a connection, they send their resume
 and then wait for work to do.  Because our worker has no experience
-:), it's resume is empty:
+:), its resume is empty:
 
     >>> from zc.resumelb.util import read_message, write_message
     >>> read_message(worker_socket)
     (0, {})
 
-When the worker sends it's resume, it sends 0 as the request number.
+When the worker sends its resume, it sends 0 as the request number.
 
 Now, let's send a request to the worker.  Requests are based on wsgi
 environments. We'll use webob to help us set this up.
@@ -120,7 +120,7 @@ We can have multiple outstanding requests:
     >>> write_message(worker_socket, 3, newenv('1', '/hi.html'))
     >>> write_message(worker_socket, 4, newenv('1', '/hi.html'))
 
-At this point, we have 3 outstading requests.  Let's create 3 bodies:
+At this point, we have 3 outstanding requests.  Let's create 3 bodies:
 
     >>> b2 = 'x'*1000
     >>> b3 = 'y'*10000
@@ -198,7 +198,7 @@ making a 5th request.
     <BLANKLINE>
     hello world
 
-The next message we recieve will be the new resume:
+The next message we receive will be the new resume:
 
     >>> zero, resume = read_message(worker_socket)
     >>> zero, resume.keys(), [x for x in resume.values() if type(x) != float]
@@ -212,7 +212,7 @@ last request, we sleep .11 seconds to assure that it's resume entry
 would be less than 10.
 
 We can reuse request numbers. We normally don't reuse request numbers
-until we get to 4 billion or so., But lets make sure we can reuse
+until we get to 4 billion or so., But let's make sure we can reuse
 them:
 
     >>> write_message(worker_socket, 1, newenv('', '/gen.html?size=100'), '')
@@ -231,14 +231,14 @@ Multiple connections (multiple load balancers)
 
 In a production deployment, there will likely be multiple load
 balancers for redundancy.  In this case, there are multiple
-connections to workers.  Let's excercise that and make sure it works
+connections to workers.  Let's excecise that and make sure it works
 properly.
 
 Open a second connection:
 
     >>> worker_socket2 = gevent.socket.create_connection(worker.addr)
 
-We're immediately send the worker's resume.
+We're immediately sent the worker's resume.
 
     >>> read_message(worker_socket2)[0]
     0
@@ -373,7 +373,7 @@ Saving and loading resumes
 --------------------------
 
 Workers can store their resumes.  This is useful if a worker has
-state, such as cache data that can be retained accross restarts.  A
+state, such as cache data that can be retained across restarts.  A
 worker will load data from and save data to a file if the
 ``resume_file`` option is used to specify a resume file name:
 
@@ -386,7 +386,7 @@ worker will load data from and save data to a file if the
     ...   history=2, max_skill_age=3,
     ...   resume_file='resume.mar')
 
-Note that we specified a max_skill_age if 4, rather than the default
+Note that we specified a max_skill_age of 4, rather than the default
 10x the history.
 
     >>> from pprint import pprint
@@ -421,7 +421,7 @@ If we do 2 more requests:
     >>> print_response(worker_socket, 4) # doctest: +ELLIPSIS
     4 200 OK...
 
-We'll get a new resume that ha sdropped the 'a' and 'b' skills:
+We'll get a new resume that has dropped the 'a' and 'b' skills:
 
     >>> rno, resume = read_message(worker_socket)
     >>> rno, sorted(resume)
@@ -430,8 +430,8 @@ We'll get a new resume that ha sdropped the 'a' and 'b' skills:
 Ignore empty strings in application iterables
 ---------------------------------------------
 
-The lb/worker protocol uses empty strings as indicate end-of-message
-markers. If an application returns empty strings in it's returned
+The lb/worker protocol uses empty strings to indicate end-of-message
+markers. If an application returns empty strings in its returned
 iterable, the worker must ignore them.
 
     >>> env = newenv('test', '/sneaky.html')
@@ -449,7 +449,7 @@ Cancellation
 
 The load balancer can cancel a request at various stages.
 
-If we send a cancelation after a request has been finalized, the
+If we send a cancellation after a request has been finalized, the
 cancellation is ignored:
 
     >>> write_message(worker_socket, 3, None)
@@ -474,18 +474,17 @@ cancellation before rending a response, because the app takes some time:
     >>> env = newenv('test', '/gsleep.html?dur=.1')
     >>> write_message(worker_socket, 6, env, '', None)
 
-Or requesting tons of data, but before recieving all of it:
+Or requesting tons of data, but before receiving all of it:
 
     >>> env = newenv('test', '/gen.html?size=1000')
     >>> write_message(worker_socket, 7, env, '')
     >>> gevent.sleep(.01)
     >>> write_message(worker_socket, 7, env, None)
 
-OK, so we sent 3 requests and cancelled all of them.  We shouldn't see
-any output for 4 and 5, as they were cancelled completed before they
-were completed.  Request 6 will be performed. Some output will be
-probably be written to the socket before the cancellation is seen, but
-not all of it.
+OK, so we sent 3 requests and cancelled all of them.  We shouldn't see any
+output for 4 and 5, as they were cancelled before they were completed.  Request
+6 will be performed. Some output will be probably be written to the socket
+before the cancellation is seen, but not all of it.
 
 We'll send another request to act as a marker in the output we get
 back:
@@ -582,7 +581,7 @@ Now, we'll make some requests:
 
 Also, note that the worker score is based on the time spent in app. It
 doesn't include time waiting.  We can see this when the worker sends
-us it's resume:
+us its resume:
 
     >>> _ = read_message(worker_socket), read_message(worker_socket)
     >>> _, resume = read_message(worker_socket)

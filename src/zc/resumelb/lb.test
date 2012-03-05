@@ -5,7 +5,7 @@ The LB algorithm is tested in pool.test.  This file aims to test the
 networking aspects of the LB.
 
 An lb takes a set of worker addresses, which it connects to.  It
-listens on an address for incoming web requests.  You can updare it's
+listens on an address for incoming web requests.  You can update its
 set of worker addresses at any time.
 
 To test lb behavior, we'll create faux workers the lb can connect to.
@@ -82,7 +82,7 @@ Because this is a get, the body is empty:
     >>> read_message(worker1)
     (1, '')
 
-If we another request for the same host, it will appear on the same
+If we send another request for the same host, it will appear on the same
 socket.  This time, we'll make a request that provides a large body:
 
     >>> app2 = webtest.TestApp(lb.handle_wsgi)
@@ -326,7 +326,7 @@ has a new socket:
     >>> workers[0].socket != worker1
     True
 
-It's not in the lb pool yet, because we haven't sent it's resume yet:
+It's not in the lb pool yet, because we haven't sent its resume yet:
 
     >>> len(lb.pool.workers)
     1
@@ -339,8 +339,8 @@ But if we send a resume, it will be:
     2
 
 In the test above, the worker was still listening the whole time.
-Let's Go a bit further.  We'll shut down the worker's server as well
-as the worker socket. When the lb gets an error, it sleaps a a second
+Let's go a bit further.  We'll shut down the worker's server as well
+as the worker socket. When the lb gets an error, it sleeps a a second
 after failed attempts.  We can change this by setting a class variable
 that exists primarily for testing.  We'll change it on the lb.
 
@@ -400,7 +400,7 @@ Now, let's remove a worker:
     >>> lb.set_worker_addrs([w.addr for w in workers])
 
 Removing a worker doesn't disconnect it, but it will prevent it from
-being reconnected if it disconnects in it's own.
+being reconnected if it disconnects on its own.
 
     >>> gevent.sleep(.01)
     >>> len(lb.pool.workers)
@@ -412,7 +412,7 @@ being reconnected if it disconnects in it's own.
     >>> len(lb.pool.workers)
     2
 
-Because the lb didn't reconnect, our's socket is till the one from
+Because the lb didn't reconnect, our socket is still the one from
 before that we closed:
 
     >>> out.socket is outsocket

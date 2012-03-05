@@ -33,7 +33,7 @@ There's a paste server runner that:
 
 - Registers with ZooKeeper, and
 
-- Get's settings from ZooKeeper.
+- Gets settings from ZooKeeper.
 
 The server runner takes options:
 
@@ -41,7 +41,7 @@ zookeeper
   A ZooKeeper connection string
 
 path
-  A zookeeper where he worker will get settings and publish it's
+  A zookeeper where the worker will get settings and publish its
   address.
 
 address
@@ -71,9 +71,9 @@ Let's create a worker, making sure that ZConfig.configureLoggers was called.
 
 Normally, when used with paste, the worker function runs forever.  We
 passed the run argument with a false value. The run argument exists
-soley for testing.
+solely for testing.
 
-The worker got it's settings from the tree:
+The worker got its settings from the tree:
 
     >>> worker.max_skill_age
     90
@@ -84,13 +84,13 @@ The worker got it's settings from the tree:
     >>> worker.decay
     0.96875
 
-It loaded it's resume from resume.mar:
+It loaded its resume from resume.mar:
 
     >>> from pprint import pprint
     >>> pprint(worker.resume)
     {'a': 1.0, 'b': 2.0}
 
-It register's it's address as an emphemeral subnode of the provider's
+It registers its address as an ephemeral subnode of the provider's
 subnode of the given path:
 
     >>> [waddr] = zk.get_children('/test/lb/workers/providers')
@@ -277,7 +277,7 @@ the options!
 
     >>> sock = gevent.socket.create_connection(addr)
     >>> sock2 = gevent.socket.create_connection(addr)
-    >>> sock3 = gevent.socket.create_connection(addr, .01)
+    >>> sock3 = gevent.socket.create_connection(addr, .00001)
     Traceback (most recent call last):
     ...
     timeout: timed out
@@ -329,7 +329,7 @@ Not that if we looked at the number of pools, it would still be
 the servers, but we didn't close the open worker connections.  We
 don't have the plumbing to do that and it's only an issue for the tests.
 
-OK. now let's shut down the server and lb.
+OK. Now let's shut down the server and lb.
 
     >>> server.stop()
     >>> lb.stop()
@@ -340,7 +340,7 @@ Finally, let's test that:
 - The server runs in non-test mode, that
 
 - we can pass an object as the access log parameter (used by
-  simulation script.), and that we can pass basoc logging information:
+  simulation script.), and that we can pass basic logging information:
 
 
     >>> worker_greenlet = gevent.spawn(zc.resumelb.zk.worker,

@@ -18,22 +18,22 @@ We'll test the pool with stand-ins for the local workers.
     >>> pool = zc.resumelb.lb.Pool(
     ...     variance=2, backlog_history=2, unskilled_score=.5)
 
-We specified a number of optional paramters that we'll see in action
+We specified a number of optional parameters that we'll see in action
 later:
 
 variance
-   How many times the pool mean backlog we'll ket a worker's backlog
+   How many times the pool mean backlog we'll let a worker's backlog
    rise before we look for another worker. The default is 4.
 
 backlog_history
-   The (aproximate) number of requests to include in the mean backlog
+   The (approximate) number of requests to include in the mean backlog
    for a worker. The default is 9.
 
    The pool also has a backlog history, which is the product of the
    worker backlog_history and the number of workers.
 
 unskilled_score
-   The score to assign to unsklilled workers. The default is 1.
+   The score to assign to unskilled workers. The default is 1.
 
 
 The get method is used to get a worker from the pool.  A request class
@@ -94,12 +94,12 @@ If we create another and register it, we'll still get the original:
 
 Here, we can see that w1 is used for the foo class and w2 for the bar
 class.  In the request classes, the worker's score and it's decayed
-backlog is shown in paretheses.  We see that both workers have a score
+backlog is shown in parentheses.  We see that both workers have a score
 of 1.0.  This is the default score for new workers.  We'll say more
 about this later.
 
 The decayed backlog, for the pool, and for workers, is an "average"
-backlog over a backlog history, which is a configation parameter.
+backlog over a backlog history, which is a configuration parameter.
 
 Let's add another worker:
 
@@ -142,9 +142,9 @@ we make another foo request, we'll start using w3:
       1: [w2]
       8: [w1, w3]
 
-Something interesting heppened here.  After several requests, the
+Something interesting happened here.  After several requests, the
 pools switched back and forth between w1 and w3.  It never switched to
-w2.  This is because, as the backlogs for w2 and w2 increased, so did
+w2.  This is because, as the backlogs for w1 and w3 increased, so did
 the mean backlog.  This is useful, because it prevents a single
 request class from taking over the entire pool.  Let's see what
 happens when we add some new workers:
@@ -171,7 +171,7 @@ The new workers caused the overall mean to drop and when we got a foo
 request, it went to the newest new worker.  The subsequent request
 went to that worker because it was skilled and had a fairly low backlog.
 
-When a worker is done doing it's work, we put it back in the pool:
+When a worker is done doing its work, we put it back in the pool:
 
     >>> for i in range(8):
     ...     pool.put(w1)
