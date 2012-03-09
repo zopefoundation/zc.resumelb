@@ -42,7 +42,7 @@ balancer's have the same information about worker skills.
 Status
 ======
 
-The current version of the load-balancer should be comnsidered
+The current version of the load-balancer should be considered
 experimental.  We're currently testing it in production.
 
 Request Classification
