@@ -27,6 +27,7 @@ class Worker:
     def __init__(self, app, addr,
                  history=9999, max_skill_age=None,
                  resume_file=None, threads=None, tracelog=None):
+        history = int(history)
         self.app = app
         self.history = history
         self.max_skill_age = max_skill_age or history * 10
@@ -49,7 +50,7 @@ class Worker:
         self.connections = set()
 
         if threads:
-            self.threadpool = gevent.threadpool.ThreadPool(threads)
+            self.threadpool = gevent.threadpool.ThreadPool(int(threads))
             pool_apply = self.threadpool.apply
         else:
             pool_apply = None
@@ -251,11 +252,9 @@ class Worker:
                     pass
 
 
-def server_runner(app, global_conf, address, history=500, threads=0, **kw):
+def server_runner(app, global_conf, address, **kw):
     # paste deploy hook
     logging.basicConfig(level=logging.INFO)
     host, port = address.split(':')
-    Worker(app, (host, int(port)), dict(history=history),
-           threads=threads and int(threads),
-           **kw).server.serve_forever()
+    Worker(app, (host, int(port)), **kw).server.serve_forever()
 

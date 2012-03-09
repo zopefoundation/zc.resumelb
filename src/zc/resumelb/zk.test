@@ -171,11 +171,12 @@ string, the string is split and testing mode (run=False) is assumed.
       -m MAX_CONNECTIONS, --max-connections=MAX_CONNECTIONS
                             Maximum number of simultanious accepted
                             connections.
-      --logger-configuration=LOGGER_CONFIGURATION
+      -L LOGGER_CONFIGURATION, --logger-configuration=LOGGER_CONFIGURATION
                             Read logger configuration from the given
                             configuration file path.  The configuration
                             file must be in ZConfig logger configuration
-                            syntax.
+                            syntax. Alternatively, you can give a Python
+                            logger level name or number.
       -r REQUEST_CLASSIFIER, --request-classifier=REQUEST_CLASSIFIER
                             Request classification function
                             (module:expr)

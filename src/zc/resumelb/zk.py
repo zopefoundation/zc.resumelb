@@ -101,11 +101,13 @@ def lbmain(args=None, run=True):
         '-m', '--max-connections', type='int',
         help="Maximum number of simultanious accepted connections.")
     parser.add_option(
-        '--logger-configuration',
+        '-L', '--logger-configuration',
         help=
         "Read logger configuration from the given configuration file path.\n"
         "\n"
         "The configuration file must be in ZConfig logger configuration syntax."
+        "\n"
+        "Alternatively, you can give a Python logger level name or number."
         )
     parser.add_option(
         '-r', '--request-classifier', default='zc.resumelb.lb:host_classifier',

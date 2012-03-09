@@ -8,6 +8,7 @@ import logging
 import re
 import sys
 import webob
+import zc.parse_addr
 import zc.resumelb.util
 
 block_size = 1<<16
@@ -351,14 +352,99 @@ def re_classifier(name, regex):
     return classifier
 
 def main(args=None):
+    """%prog [options] worker_addresses
+
+    Run a resume-based load balancer on the give addresses.
+    """
     if args is None:
         args = sys.argv[1:]
 
-    logging.basicConfig(level=logging.INFO)
-    addrs = map(parse_addr, args)
-    wsgi_addr = addrs.pop(0)
+    import optparse
+    parser = optparse.OptionParser(main.__doc__)
+    parser.add_option(
+        '-a', '--address', default=':0',
+        help="Address to listed on for web requests"
+        )
+    parser.add_option(
+        '-l', '--access-log', default='-',
+        help='Access-log path.\n\n'
+        'Use - (default) for standard output.\n'
+        )
+    parser.add_option(
+        '-b', '--backlog', type='int',
+        help="Server backlog setting.")
+    parser.add_option(
+        '-m', '--max-connections', type='int',
+        help="Maximum number of simultanious accepted connections.")
+    parser.add_option(
+        '-L', '--logger-configuration',
+        help=
+        "Read logger configuration from the given configuration file path.\n"
+        "\n"
+        "The configuration file must be in ZConfig logger configuration syntax."
+        )
+    parser.add_option(
+        '-r', '--request-classifier', default='zc.resumelb.lb:host_classifier',
+        help="Request classification function (module:expr)"
+        )
+    parser.add_option(
+        '-e', '--disconnect-message',
+        help="Path to error page to use when a request is lost due to "
+        "worker disconnection"
+        )
+    parser.add_option(
+        '-v', '--variance', type='float', default=4.0,
+        help="Maximum ration of a worker backlog to the mean backlog"
+        )
+    parser.add_option(
+        '--backlog-history', type='int', default=9,
+        help="Rough numner of requests to average worker backlogs over"
+        )
 
-    lb = LB(addrs, host_classifier)
+    parser.add_option(
+        '--unskilled-score', type='float', default=1.0,
+        help="Score (requests/second) to assign to new workers."
+        )
+
+    options, args = parser.parse_args(args)
+    if not args:
+        print 'Error: must supply one or more worker addresses.'
+        parser.parse_args(['-h'])
+
+    if options.logger_configuration:
+        logger_config = options.logger_configuration
+        if re.match(r'\d+$', logger_config):
+            logging.basicConfig(level=int(logger_config))
+        elif logger_config in ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'):
+            logging.basicConfig(level=getattr(logging, logger_config))
+        else:
+            import ZConfig
+            with open(logger_config) as f:
+                ZConfig.configureLoggers(f.read())
+
+    addrs = map(parse_addr, args)
+    wsgi_addr = parse_addr(options.address)
+
+    lb = LB(addrs, host_classifier,
+            variance=options.variance,
+            backlog_history=options.backlog_history,
+            unskilled_score=options.unskilled_score)
+
+    # Now, start a wsgi server
+    addr = zc.parse_addr.parse_addr(options.address)
+    if options.max_connections:
+        spawn= gevent.pool.Pool(options.max_connections)
+    else:
+        spawn = 'default'
+
+    accesslog = options.access_log
+    if isinstance(accesslog, str):
+        accesslog = sys.stdout if accesslog == '-' else open(accesslog, 'a')
+
+    gevent.pywsgi.WSGIServer(
+        wsgi_addr, lb.handle_wsgi, backlog = options.backlog,
+        spawn = spawn, log = accesslog)
+
     gevent.pywsgi.WSGIServer(wsgi_addr, lb.handle_wsgi).serve_forever()
 
 
