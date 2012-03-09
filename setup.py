@@ -30,6 +30,15 @@ main = zc.resumelb.worker:server_runner
 zk   = zc.resumelb.zk:worker
 """
 
+# copy README to root.
+import os
+here = os.path.dirname(__file__)
+with open(
+    os.path.join(here, *(['src'] + name.split('.') + ['README.txt']))
+    ) as inp:
+    with open(os.path.join(here, 'README.txt'), 'w') as outp:
+        outp.write(inp.read())
+
 from setuptools import setup
 
 setup(
@@ -51,3 +60,5 @@ setup(
     tests_require = extras_require['test'],
     test_suite = name+'.tests.test_suite',
     )
+
+os.remove(os.path.join(here, 'README.txt'))
