@@ -11,7 +11,7 @@ The load balancer can benefit you if you have an application that:
 - has too much load (or is too slow) to be handled by a single
   process,
 
-- has a working set that is too much to large to fir in the caches
+- has a working set that is too large to fit in the caches
   used by your process, and
 
 - there is a way to classify requests so that there is little overlap
@@ -38,6 +38,34 @@ connect to them.
 Multiple load balancers can be used for redundancy or load
 distribution.  Resumes are managed by workers to assure that load
 balancer's have the same information about worker skills.
+
+Status
+======
+
+The current version of the load-balancer should be comnsidered
+experimental.  We're currently testing it in production.
+
+Request Classification
+======================
+
+You need to provide a request-classification function that takes a
+WSGI environment and returns a request class string.
+
+Two classifiers are built-in:
+
+host
+  The host classifier uses HTTP Host header values, normalized by
+  removing leading "www." prefixes, if present.
+
+re_classifier
+  A general classifier (factory) that applies a regular expression
+  with a ``class`` group to an environment value.
+
+  For example, to use the first step in a request URL path, you'd use
+  the following request-classifier option to one of the load-balancer
+  scripts described below::
+
+    -r 'zc.resumelb.lb:re_classifier("PATH_INFO",r"/(?P<class>[^/]+)")'
 
 Deployment
 ==========
@@ -199,7 +227,7 @@ And here's a load-balancer command you'd use with this worker::
   zkresumelb -LINFO 127.0.0.1:2181 /lb
 
 The above example assumes you have a ZooKeeper server running on port
-2181 and that it includes a tree that looks like:
+2181 and that it includes a tree that looks like::
 
   /lb
     /providers
