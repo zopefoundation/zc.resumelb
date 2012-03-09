@@ -16,7 +16,7 @@ We'll test the pool with stand-ins for the local workers.
 
     >>> import zc.resumelb.lb
     >>> pool = zc.resumelb.lb.Pool(
-    ...     variance=2, backlog_history=2, unskilled_score=.5)
+    ...     variance=2.5, backlog_history=2, unskilled_score=.5)
 
 We specified a number of optional parameters that we'll see in action
 later:
@@ -108,18 +108,18 @@ Let's add another worker:
 
 and make some more foo requests:
 
-    >>> [pool.get('foo') for i in range(4)]
-    [w1, w1, w1, w1]
+    >>> [pool.get('foo') for i in range(2)]
+    [w1, w1]
 
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(0.5,1.0)
-      foo: w1(0.5,4.29907929908)
+      foo: w1(0.5,2.85...)
     Backlogs:
-      overall backlog: 7 Decayed: 4.39137888071 Avg: 1.46379296024
+      overall backlog: 5 Decayed: 3.21... Avg: 1.07...
       0: [w3]
       1: [w2]
-      6: [w1]
+      4: [w1]
 
 Even though we still had a worker with no backlog, we kept sending
 requests to w1.  This is because w1 hasn't reached the maximum
@@ -131,16 +131,16 @@ So now, w1 has reached it's maximum backlog.  If
 we make another foo request, we'll start using w3:
 
     >>> [pool.get('foo') for i in range(10)]
-    [w3, w3, w3, w3, w3, w3, w1, w3, w1, w3]
+    [w3, w3, w3, w3, w1, w3, w1, w3, w1, w3]
 
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(0.5,1.0)
-      foo: w1(0.5,5.89000423908), w3(0.5,5.89000423908)
+      foo: w1(0.5,5.07...), w3(0.5,5.07...)
     Backlogs:
-      overall backlog: 17 Decayed: 11.0516220545 Avg: 3.68387401818
+      overall backlog: 15 Decayed: 9.61... Avg: 3.20...
       1: [w2]
-      8: [w1, w3]
+      7: [w1, w3]
 
 Something interesting happened here.  After several requests, the
 pools switched back and forth between w1 and w3.  It never switched to
@@ -157,12 +157,12 @@ happens when we add some new workers:
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(0.5,1.0)
-      foo: w1(0.5,5.89000423908), w3(0.5,5.89000423908)
+      foo: w1(0.5,5.07...), w3(0.5,5.07...)
     Backlogs:
-      overall backlog: 17 Decayed: 11.0516220545 Avg: 2.21032441091
+      overall backlog: 15 Decayed: 9.61... Avg: 1.92...
       0: [w4, w5]
       1: [w2]
-      8: [w1, w3]
+      7: [w1, w3]
 
     >>> [pool.get('foo') for i in range(2)]
     [w5, w5]
@@ -181,9 +181,9 @@ When a worker is done doing its work, we put it back in the pool:
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(0.5,1.0)
-      foo: w1(0.5,2.45398560273), w3(0.5,2.45398560273), w5(0.5,1.57142857143)
+      foo: w1(0.5,2.29...), w3(0.5,2.29...), w5(0.5,1.57...)
     Backlogs:
-      overall backlog: 3 Decayed: 10.2983868199 Avg: 2.05967736397
+      overall backlog: 1 Decayed: 8.41... Avg: 1.68...
       0: [w1, w3, w4]
       1: [w2]
       2: [w5]
@@ -204,9 +204,9 @@ data.
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.45...), w1(6.0,2.08...)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.29...), w1(6.0,1.96...)
     Backlogs:
-      overall backlog: 4 Decayed: 9.90317056202 Avg: 1.9806341124
+      overall backlog: 2 Decayed: 8.00... Avg: 1.60...
       0: [w3, w4]
       1: [w1, w2]
       2: [w5]
@@ -221,9 +221,9 @@ data.
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.08...), w1(6.0,2.30...)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,1.96...), w1(6.0,2.23...)
     Backlogs:
-      overall backlog: 7 Decayed: 9.23495653237 Avg: 1.84699130647
+      overall backlog: 5 Decayed: 7.31... Avg: 1.46...
       0: [w4]
       1: [w2, w3]
       2: [w5]
@@ -245,16 +245,16 @@ data.
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,1.43...), w1(6.0,2.79...)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,1.40...), w1(6.0,2.75...)
     Backlogs:
-      overall backlog: 4 Decayed: 8.35... Avg: 1.67...
+      overall backlog: 2 Decayed: 6.39... Avg: 1.27...
       0: [w3, w4]
       1: [w2]
       2: [w5]
       3: [w1]
 
     >>> [pool.get('foo') for i in range(5)]
-    [w3, w3, w1, w3, w1]
+    [w3, w3, w1, w3, w2]
 
 Worker disconnect
 =================
@@ -265,13 +265,12 @@ When a worker disconnect, it's removed from the pool:
     >>> pool.remove(w3)
     >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57142857143), w2(2.0,1.0)
+      bar: w2(2.0,1.57...)
+      foo: w5(0.5,1.57...), w2(2.0,1.57...)
     Backlogs:
-      overall backlog: 9 Decayed: 8.043843598 Avg: 2.68128119933
+      overall backlog: 7 Decayed: 6.07... Avg: 2.02...
       0: [w4]
-      1: [w2]
-      2: [w5]
+      2: [w2, w5]
 
 Updating worker settings
 ========================

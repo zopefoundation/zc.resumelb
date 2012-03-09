@@ -195,7 +195,7 @@ class Pool:
         if skilled is None:
             skilled = self.skilled[rclass] = set()
 
-        max_backlog = self.variance * max(self.mbacklog / self.nworkers, 2)
+        max_backlog = max(self.variance * self.mbacklog / self.nworkers, 1)
         for score, worker in skilled:
             if worker.mbacklog > max_backlog:
                 continue
