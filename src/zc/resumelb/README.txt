@@ -237,3 +237,10 @@ The above example assumes you have a ZooKeeper server running on port
 See http://pypi.python.org/pypi/zc.zk to learn more about building and
 maintaining ZooKeeper trees.
 
+Change History
+==============
+
+0.1.0 (2012-03-09)
+------------------
+
+Initial release.
