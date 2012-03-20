@@ -57,7 +57,8 @@ def sneaky():
 def sleep(bobo_request, dur=0):
     time.sleep(float(dur))
     if 'tracelog' in bobo_request.environ:
-        bobo_request.environ['tracelog']('T', 'test')
+        bobo_request.environ['tracelog'].log('test', 'T')
+        bobo_request.environ['tracelog'].log('test2')
     return 'hello world\n'
 
 @bobo.query('/gsleep.html')

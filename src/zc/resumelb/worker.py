@@ -26,7 +26,8 @@ class Worker:
 
     def __init__(self, app, addr,
                  history=9999, max_skill_age=None,
-                 resume_file=None, threads=None, tracelog=None):
+                 resume_file=None, threads=None, tracelog=None,
+                 tracelog_key='tracelog'):
         history = int(history)
         self.app = app
         self.history = history
@@ -76,11 +77,18 @@ class Worker:
                     info(no_message_format, code, rno, now())
             tracelog = log
 
+            class ApplicationTraceLog(object):
+
+                def __init__(self, rno):
+                    self.rno = rno
+
+                def log(self, msg=None, code='-'):
+                    log(self.rno, code, msg)
+
+
             def call_app_w_tracelog(rno, env):
                 log(rno, 'C')
-                env['tracelog'] = (
-                    lambda code, message=None: log(rno, code, message)
-                    )
+                env[tracelog_key] = ApplicationTraceLog(rno)
                 response, body = call_app(rno, env)
                 content_length = [v for (h, v) in response[1]
                                   if h.lower() == 'content-length']

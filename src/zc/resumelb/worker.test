@@ -565,6 +565,7 @@ Now, we'll make some requests:
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
     I 1 2012-02-05 01:02:03.030456
     T 2 2012-02-05 01:02:03.030456 test
+    - 2 2012-02-05 01:02:03.030456 test2
     A 2 2012-02-05 01:02:03.030456 200 OK 12
     C 1 2012-02-05 01:02:03.030456
     E 2 2012-02-05 01:02:03.030456
@@ -575,6 +576,7 @@ Now, we'll make some requests:
     (2, '')
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
     T 1 2012-02-05 01:02:03.030456 test
+    - 1 2012-02-05 01:02:03.030456 test2
     A 1 2012-02-05 01:02:03.030456 200 OK 12
     E 1 2012-02-05 01:02:03.030456
     (1, ('200 OK', [...('Content-Length', '12')]))
