@@ -8,7 +8,7 @@ import socket
 logger = logging.getLogger(__name__)
 
 disconnected_errors = (errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN,
-                 errno.ESHUTDOWN, errno.ECONNABORTED)
+                       errno.ESHUTDOWN, errno.ECONNABORTED)
 
 class Disconnected(Exception):
     pass
@@ -16,7 +16,15 @@ class Disconnected(Exception):
 def read_message(sock):
     data = ''
     while len(data) < 8:
-        recieved = sock.recv(8-len(data))
+        try:
+            recieved = sock.recv(8-len(data))
+        except socket.error, err:
+            if err.args[0] in disconnected_errors:
+                logger.debug("write_message disconnected %s", sock)
+                raise Disconnected()
+            else:
+                raise
+
         if not recieved:
             logger.info("read_message disconnected %s", sock)
             raise Disconnected()
