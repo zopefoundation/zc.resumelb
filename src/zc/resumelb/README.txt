@@ -240,6 +240,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.1.1 (2012-03-??)
+------------------
+
+- Updated the API for application trace logging to match that of
+  zc.zservertracelog, mainly to get database logging for ZTK
+  applications.
+
 0.1.0 (2012-03-09)
 ------------------
 
