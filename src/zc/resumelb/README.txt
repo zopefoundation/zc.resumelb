@@ -243,6 +243,8 @@ Change History
 0.1.1 (2012-03-??)
 ------------------
 
+- Added graceful worker shutdown on SIGTERM.
+
 - Updated the API for application trace logging to match that of
   zc.zservertracelog, mainly to get database logging for ZTK
   applications.

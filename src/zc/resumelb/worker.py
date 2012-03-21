@@ -136,6 +136,15 @@ class Worker:
         if hasattr(self, 'threadpool'):
             self.threadpool.kill()
 
+    def shutdown(self):
+        self.server.close()
+        while 1:
+            if [conn for conn in self.connections if conn.readers]:
+                gevent.sleep(.01)
+            else:
+                break
+        self.stop()
+
     def handle_connection(self, sock, addr):
         try:
             conn = zc.resumelb.util.Worker()

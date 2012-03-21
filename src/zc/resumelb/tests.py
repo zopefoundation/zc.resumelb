@@ -18,6 +18,7 @@ import hashlib
 import manuel.capture
 import manuel.doctest
 import manuel.testing
+import mock
 import os
 import re
 import time
@@ -77,6 +78,7 @@ def test_classifier(env):
 
 def setUp(test):
     zope.testing.setupstack.setUpDirectory(test)
+    zope.testing.setupstack.context_manager(test, mock.patch('gevent.signal'))
     global pid
     pid = 6115
     test.globs['wait'] = zope.testing.wait.Wait(getsleep=lambda : gevent.sleep)

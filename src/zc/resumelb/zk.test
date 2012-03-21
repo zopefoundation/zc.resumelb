@@ -101,9 +101,32 @@ subnode of the given path:
     >>> bool(meta['ephemeralOwner'])
     True
 
+Shutdown
+--------
+
+A shutdown signal handler is registered.  We can call it to shut the
+worker down:
+
+    >>> import gevent, signal
+    >>> gevent.signal.call_args[0][0] == signal.SIGTERM
+    True
+
+    >>> gevent.signal.call_args[0][1]()
+    >>> gevent.sleep(.01)
+    >>> zk.get_children('/test/lb/workers/providers')
+    []
+
+    >>> gevent.socket.create_connection(worker.addr)
+    Traceback (most recent call last):
+    ...
+    error: [Errno 111] Connection refused
+
+
+Variations
+----------
+
 Let's try again, but this time, don't set up logging:
 
-    >>> worker.stop(); worker.zk.close()
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(

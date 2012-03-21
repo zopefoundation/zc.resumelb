@@ -18,6 +18,7 @@ import gevent.pool
 import logging
 import os
 import re
+import signal
 import sys
 import zc.parse_addr
 import zc.zk
@@ -59,6 +60,12 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
     zk.register_server(path+'/providers', worker.addr, **registration_data)
     worker.zk = zk
     worker.__zksettings = settings
+
+    def shutdown():
+        zk.close()
+        worker.shutdown()
+
+    gevent.signal(signal.SIGTERM, shutdown)
 
     if run:
         try:

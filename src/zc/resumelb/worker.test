@@ -341,6 +341,30 @@ We're due for another resume.  We should get it on both sockets!
     True
 
 
+Gracefull shutdown
+==================
+
+Workers have a shutdown method that stops accepting and waits for
+outstanding requests to be completed.  We have some outstating
+requests. Let's shutdown:
+
+    >>> shutdown_greenlet = gevent.spawn(worker.shutdown)
+
+We used a greenlet, because we don't want to block.
+
+    >>> shutdown_greenlet.join(.01)
+    >>> shutdown_greenlet.ready()
+    False
+
+We can't connect to the worker anymore:
+
+    >>> gevent.socket.create_connection(worker.addr)
+    Traceback (most recent call last):
+    ...
+    error: [Errno 111] Connection refused
+
+If we finish the outstanding requests, the worker will finish shutting down:
+
     >>> write_message(worker_socket, 3, '')
     >>> print_response(worker_socket, 3) # doctest: +NORMALIZE_WHITESPACE
     3 200 OK
@@ -365,9 +389,9 @@ We're due for another resume.  We should get it on both sockets!
     6115 10000 44bd0dbf8208fea52dc6180376d14798b86847bd
     <BLANKLINE>
 
-Cleanup:
-
-    >>> worker.stop()
+    >>> shutdown_greenlet.join(.1)
+    >>> shutdown_greenlet.ready()
+    True
 
 Saving and loading resumes
 --------------------------
