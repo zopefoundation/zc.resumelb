@@ -359,9 +359,10 @@ We used a greenlet, because we don't want to block.
 We can't connect to the worker anymore:
 
     >>> gevent.socket.create_connection(worker.addr)
+    ... # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    error: [Errno 111] Connection refused
+    error: [Errno ...] Connection refused
 
 If we finish the outstanding requests, the worker will finish shutting down:
 

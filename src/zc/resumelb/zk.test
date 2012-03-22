@@ -116,10 +116,10 @@ worker down:
     >>> zk.get_children('/test/lb/workers/providers')
     []
 
-    >>> gevent.socket.create_connection(worker.addr)
+    >>> gevent.socket.create_connection(worker.addr) # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    error: [Errno 111] Connection refused
+    error: [Errno ...] Connection refused
 
 
 Variations
@@ -283,9 +283,10 @@ worker down:
     []
 
     >>> gevent.socket.create_connection(('127.0.0.1', addr[1]))
+    ... # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    error: [Errno 111] Connection refused
+    error: [Errno ...] Connection refused
 
     >>> lb.workletts
     {}
