@@ -209,6 +209,13 @@ def lbmain(args=None, run=True):
     zk.register_server(path+'/providers', (addr[0], server.server_port),
                        **registration_data)
 
+    def shutdown():
+        zk.close()
+        server.close()
+        lb.shutdown()
+
+    gevent.signal(signal.SIGTERM, shutdown)
+
     if run:
         try:
             server.serve_forever()

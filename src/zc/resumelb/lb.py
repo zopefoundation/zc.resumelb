@@ -54,7 +54,13 @@ class LB:
             try:
                 socket = gevent.socket.create_connection(addr)
                 Worker(self.pool, socket, addr)
-            except Exception:
+            except gevent.GreenletExit, v:
+                try:
+                    socket.close()
+                except:
+                    pass
+                raise
+            except Exception, v:
                 logger.exception('lb connecting to %r', addr)
                 gevent.sleep(self.connect_sleep)
 
@@ -62,6 +68,11 @@ class LB:
         for g in self.workletts.values():
             g.kill()
         self.workletts.clear()
+
+    def shutdown(self):
+        while self.pool.backlog:
+            gevent.sleep(.01)
+        self.stop()
 
     def handle_wsgi(self, env, start_response):
         rclass = self.classifier(env)
@@ -173,10 +184,16 @@ class Pool:
             self.unskilled.remove(worker.lnode)
             worker.lnode = None
         self.workers.remove(worker)
+
+        self.backlog -= worker.backlog
+        assert self.backlog >= 0, self.backlog
+        _decay_backlog(self, self.decay)
+
         self.nworkers = len(self.workers)
         if self.nworkers:
             self._update_decay()
         else:
+            assert self.backlog == 0, self.backlog
             self.event.clear()
 
     def get(self, rclass, timeout=None):

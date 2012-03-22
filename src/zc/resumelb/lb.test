@@ -316,6 +316,12 @@ The second GET and the HEAD request will be send to worker2:
     </body></html>
     <BLANKLINE>
 
+Note that at this point, there shouldn't be any in-flight requests and
+the backlog should be 0:
+
+    >>> lb.pool.backlog
+    0
+
 Automatic reconnection
 ======================
 
@@ -421,11 +427,58 @@ before that we closed:
 Typically, by the time we remove an address, the worker will already
 have gone away.
 
-----------------------------------------------------------
+Graceful shutdown
+=================
 
-Cleanup:
+Load balancers have a shutdown method that:
 
-    >>> lb.stop()
+- stops accepting web connections
+- Waits for requests to be worked off
+- disconnects from workers
+
+We already have a request in flight.  Let's add another on a different
+worker:
+
+    >>> g2 = gevent.spawn(app2.get, '/hi.html', {}, [('Host', 'h2.com')])
+
+    >>> gevent.sleep(.01)
+    >>> [w.backlog for w in lb.pool.workers]
+    [1, 1]
+
+If we call shutdown, it will block until we have no in-flight
+connections, so we'll call it in a greenlet:
+
+    >>> shutdown_greenlet = gevent.spawn(lb.shutdown)
+    >>> gevent.sleep(.01)
+    >>> shutdown_greenlet.ready()
+    False
+
+Now, let's finish the outstanding requests:
+
+    >>> write_message(workers[-1].socket, rno,
+    ...      (response.status, response.headers.items()))
+    >>> write_message(workers[-1].socket, rno, response.body)
+    >>> write_message(workers[-1].socket, rno, '')
+    >>> g.join()
+
+    >>> rno, env = read_message(workers[0].socket)
+    >>> read_message(workers[0].socket)
+    (4, '')
+
+    >>> write_message(workers[0].socket, rno,
+    ...      (response.status, response.headers.items()))
+    >>> write_message(workers[0].socket, rno, response.body)
+    >>> write_message(workers[0].socket, rno, '')
+    >>> g2.join()
+
+    >>> gevent.sleep(.01)
+    >>> shutdown_greenlet.ready()
+    True
+
+At this point, the worker sockets are closed:
+
+    >>> [w.socket.recv(1) for w in workers]
+    ['', '']
 
 Built-in request classifiers
 ============================

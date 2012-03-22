@@ -166,7 +166,6 @@ Let's try again, but this time, set up basic logging with a numeric level:
     ...     if configureLoggers.called: print 'configureLoggers'
     ...     basicConfig.assert_called_with(level=42)
 
-
 LB
 ==
 
@@ -210,8 +209,12 @@ string, the string is split and testing mode (run=False) is assumed.
 
 Let's start with a simple call:
 
+
+    >>> gevent.signal.reset_mock()
     >>> lb, server, accesslog = zc.resumelb.zk.lbmain(
     ...     'zookeeper.example.com:2181 /test/lb')
+
+    >>> sig, sighandler = gevent.signal.call_args[0]
 
     >>> import sys
     >>> accesslog is sys.stdout
@@ -265,12 +268,34 @@ We want to make sure that non-test mode works:
     >>> len(lb.pool.workers)
     2
 
+Shutdown
+--------
+
+A shutdown signal handler is registered.  We can call it to shut the
+worker down:
+
+    >>> sig == signal.SIGTERM
+    True
+
+    >>> sighandler()
+    >>> gevent.sleep(.01)
+    >>> zk.get_children('/test/lb/providers')
+    []
+
+    >>> gevent.socket.create_connection(('127.0.0.1', addr[1]))
+    Traceback (most recent call last):
+    ...
+    error: [Errno 111] Connection refused
+
+    >>> lb.workletts
+    {}
+
+
+Variations
+-----------
+
 OK, so let's try a more complex example.  Maybe we can exercise all of
 the options!
-
-    >>> server.stop()
-    >>> lb.stop()
-    >>> lb.zk.close()
 
     >>> with open('log.conf', 'w') as f:
     ...   f.write('loggers')
