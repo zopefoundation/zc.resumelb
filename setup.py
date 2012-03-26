@@ -59,6 +59,9 @@ setup(
     extras_require = extras_require,
     tests_require = extras_require['test'],
     test_suite = name+'.tests.test_suite',
+
+    # To get gevent 1.0b1
+    dependency_links = ['http://code.google.com/p/gevent/downloads/list'],
     )
 
 os.remove(os.path.join(here, 'README.txt'))

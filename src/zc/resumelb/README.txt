@@ -245,6 +245,9 @@ Change History
 
 - Added graceful load-balancer and worker shutdown on SIGTERM.
 
+- Added packaging meta data to help find gevent 1.0b1
+  (which is at http://code.google.com/p/gevent/downloads/list)
+
 - Updated the API for application trace logging to match that of
   zc.zservertracelog, mainly to get database logging for ZTK
   applications.
