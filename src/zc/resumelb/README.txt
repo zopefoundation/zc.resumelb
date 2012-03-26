@@ -240,8 +240,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.1.1 (2012-03-??)
+0.2.0 (2012-03-??)
 ------------------
+
+- The update settings methods were changed to revert settings to
+  default when not provided.  This is especially important when used
+  with ZooKeeper, so you can look at a tree and know what settings are
+  without knowing the change history.
 
 - Added graceful load-balancer and worker shutdown on SIGTERM.
 

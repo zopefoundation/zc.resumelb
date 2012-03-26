@@ -98,12 +98,8 @@ class LB:
 
 class Pool:
 
-    def __init__(self, unskilled_score=1.0, variance=4.0, backlog_history=9):
-        self.unskilled_score = unskilled_score
-        self.variance = variance
-        self.backlog_history = backlog_history
-        self._update_worker_decay()
-
+    def __init__(self,
+                 unskilled_score=None, variance=None, backlog_history=None):
         self.workers = set()
         self.nworkers = 0
         self.unskilled = llist.dllist()
@@ -111,14 +107,29 @@ class Pool:
         self.event = gevent.event.Event()
         _init_backlog(self)
 
-    def update_settings(self, settings):
-        for name in ('unskilled_score', 'variance', 'backlog_history'):
-            if name in settings:
-                setattr(self, name, settings[name])
+        self.update_settings(dict(
+            unskilled_score=unskilled_score,
+            variance=variance,
+            backlog_history=backlog_history))
 
-        if 'backlog_history' in settings:
-            self._update_worker_decay()
-            self._update_decay()
+
+    _meta_settings = dict(
+        unskilled_score=1.0,
+        variance=4.0,
+        backlog_history=9
+        )
+
+    def update_settings(self, settings):
+        for name, default in self._meta_settings.iteritems():
+            setting = settings.get(name)
+            if setting is None:
+                setting = default
+            else:
+                setting = type(default)(setting)
+            setattr(self, name, setting)
+
+        self._update_worker_decay()
+        self._update_decay()
 
     def _update_decay(self):
         if self.nworkers:

@@ -648,6 +648,15 @@ settings at run time. It takes a settings dictionary.
 
     >>> worker.update_settings(dict(max_skill_age=99))
     >>> worker.history, worker.max_skill_age
+    (9999, 99)
+
+Note that in the last example, the history setting reverted to it's
+default value, because it wasn't set in the settings.
+
+Settings are automaticaly coerced you they expected types:
+
+    >>> worker.update_settings(dict(history='5', max_skill_age='99'))
+    >>> worker.history, worker.max_skill_age
     (5, 99)
 
 Resume computation and decay

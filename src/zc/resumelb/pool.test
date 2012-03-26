@@ -296,3 +296,23 @@ Updating worker settings
     (3.0, 6, 0.25)
     >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
     (0.916..., 0.972...)
+
+Note that settings revert to their default values when not specified:
+
+    >>> pool.update_settings({})
+    >>> pool.variance, pool.backlog_history, pool.unskilled_score
+    (4.0, 9, 1.0)
+    >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
+    (0.944..., 0.981...)
+
+Settings are automatically coerced to their expected types:
+
+    >>> pool.update_settings(
+    ... dict(variance=3, backlog_history=6.2, unskilled_score=2))
+    >>> pool.variance, pool.backlog_history, pool.unskilled_score
+    (3.0, 6, 2.0)
+
+    >>> pool.update_settings(
+    ... dict(variance='2', backlog_history='7', unskilled_score='1'))
+    >>> pool.variance, pool.backlog_history, pool.unskilled_score
+    (2.0, 7, 1.0)

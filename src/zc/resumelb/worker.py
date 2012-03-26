@@ -25,14 +25,11 @@ def error(mess):
 class Worker:
 
     def __init__(self, app, addr,
-                 history=9999, max_skill_age=None,
+                 history=None, max_skill_age=None,
                  resume_file=None, threads=None, tracelog=None,
                  tracelog_key='tracelog'):
-        history = int(history)
         self.app = app
-        self.history = history
-        self.max_skill_age = max_skill_age or history * 10
-        self.decay = 1.0-1.0/history
+        self.update_settings(dict(history=history, max_skill_age=max_skill_age))
         self.resume_file = resume_file
         self.perf_data = {} # rclass -> (gen, decayed times, decayed counts)
         self.generation = 0
@@ -123,13 +120,21 @@ class Worker:
         self.addr = addr[0], self.server.server_port
 
     def update_settings(self, data):
-        if 'history' in data:
-            self.history = data['history']
-            if 'max_skill_age' not in data:
-                self.max_skill_age = self.history * 10
-        if 'max_skill_age' in data:
-            self.max_skill_age = data['max_skill_age']
-        self.decay = 1 - 1.0/self.history
+        history = data.get('history')
+        if history is None:
+            history = 9999
+        else:
+            history = int(history)
+        self.history = history
+
+        max_skill_age = data.get('max_skill_age')
+        if max_skill_age is None:
+            max_skill_age = history * 10
+        else:
+            max_skill_age = int(max_skill_age)
+        self.max_skill_age = max_skill_age
+
+        self.decay = 1 - 1.0/history
 
     def stop(self):
         self.server.stop()
