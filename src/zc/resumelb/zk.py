@@ -15,6 +15,8 @@
 """
 import gevent
 import gevent.pool
+import gevent.server
+import json
 import logging
 import os
 import re
@@ -107,6 +109,10 @@ def lbmain(args=None, run=True):
     parser.add_option(
         '-m', '--max-connections', type='int',
         help="Maximum number of simultanious accepted connections.")
+    parser.add_option(
+        '-s', '--status-server',
+        help=("Run a status server for getting pool information. "
+              "The argument is an address to listen on."))
     parser.add_option(
         '-L', '--logger-configuration',
         help=
@@ -206,12 +212,38 @@ def lbmain(args=None, run=True):
         bd.start()
         registration_data['backdoor'] = '127.0.0.1:%s' % bd.server_port
 
+    status_server = None
+    if options.status_server:
+        def status(socket, addr):
+            pool = lb.pool
+            writer = socket.makefile('w')
+            writer.write(json.dumps(
+                dict(
+                    backlog = pool.backlog,
+                    mean_backlog = pool.mbacklog,
+                    workers = [
+                        (worker.__name__, worker.backlog, worker.mbacklog)
+                        for worker in sorted(
+                            pool.workers, key=lambda w: w.__name__)
+                        ]
+                    ))+'\n')
+            writer.close()
+            socket.close()
+        status_server_address = zc.parse_addr.parse_addr(options.status_server)
+        status_server = gevent.server.StreamServer(
+            status_server_address, status)
+        status_server.start()
+        registration_data['status'] = "%s:%s" % (
+            status_server_address[0], status_server.server_port)
+
     zk.register_server(path+'/providers', (addr[0], server.server_port),
                        **registration_data)
 
     def shutdown():
         zk.close()
         server.close()
+        if status_server is not None:
+            status_server.close()
         lb.shutdown()
 
     gevent.signal(signal.SIGTERM, shutdown)

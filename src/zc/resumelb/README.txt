@@ -45,6 +45,8 @@ Status
 The current version of the load-balancer should be considered
 experimental.  We're currently testing it in production.
 
+The documentation is a bit thin, but there are extensive doctests.
+
 Request Classification
 ======================
 
@@ -255,6 +257,11 @@ Change History
   There's also a scriot version of this::
 
     bin/get-worker-resume 192.168.24.60:33161
+
+- When using ZooKeeper, you can request an lb status server.  The
+  address gets registered with ZooKeeper. When you connect to it, you
+  get back a json string containing the overall lb backlog and
+  addresses and backlogs of each worker.
 
 - The update settings methods were changed to revert settings to
   default when not provided.  This is especially important when used

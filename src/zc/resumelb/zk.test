@@ -193,6 +193,10 @@ string, the string is split and testing mode (run=False) is assumed.
       -m MAX_CONNECTIONS, --max-connections=MAX_CONNECTIONS
                             Maximum number of simultanious accepted
                             connections.
+      -s STATUS_SERVER, --status-server=STATUS_SERVER
+                            Run a status server for getting pool
+                            information. The argument is an address to
+                            listen on.
       -L LOGGER_CONFIGURATION, --logger-configuration=LOGGER_CONFIGURATION
                             Read logger configuration from the given
                             configuration file path.  The configuration
@@ -212,7 +216,7 @@ Let's start with a simple call:
 
     >>> gevent.signal.reset_mock()
     >>> lb, server, accesslog = zc.resumelb.zk.lbmain(
-    ...     'zookeeper.example.com:2181 /test/lb')
+    ...     'zookeeper.example.com:2181 /test/lb -s :0')
 
     >>> sig, sighandler = gevent.signal.call_args[0]
 
@@ -267,6 +271,37 @@ We want to make sure that non-test mode works:
 
     >>> len(lb.pool.workers)
     2
+
+LB status server
+----------------
+
+When we started the lb, we told it to create a status server.  The
+server is registered with ZooKeeper:
+
+    >>> status_addr = zc.parse_addr.parse_addr(
+    ...     zk.get_properties(
+    ...         '/test/lb/providers/' +
+    ...         zk.get_children('/test/lb/providers')[0])['status'])
+    >>> status_socket = gevent.socket.create_connection(
+    ...     ('127.0.0.1', status_addr[1]))
+    >>> status_file = status_socket.makefile()
+    >>> import json
+    >>> status = json.loads(status_file.read())
+    >>> pprint(status, width=1) # doctest: +ELLIPSIS
+    {u'backlog': 0,
+     u'mean_backlog': 0.4...,
+     u'workers': [[u'127.0.0.1:...',
+                   0,
+                   ...],
+                  [u'127.0.0.1:...',
+                   0,
+                   ...]]}
+
+    >>> sorted(status['workers'], key=lambda w: w[2]) # doctest: +ELLIPSIS
+    [[u'127.0.0.1:...', 0, 0], [u'127.0.0.1:...', 0, 0.48...]]
+
+    >>> status_file.close()
+    >>> status_socket.close()
 
 Shutdown
 --------
