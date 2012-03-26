@@ -340,6 +340,26 @@ We're due for another resume.  We should get it on both sockets!
     >>> read_message(worker_socket2) == (zero, resume)
     True
 
+Monitoring/getting resumes
+==========================
+
+As we saw above, when an lb connects to a worker, the worker sends it
+its resume.  A utility, ``zc.resumelb.worker.get_resume`` leverages
+this to connect to a worker and get it's resume.  This is useful both
+to get the worker's resume, and to make sure the worker is accepting
+lb connections:
+
+    >>> sorted(zc.resumelb.worker.get_resume(worker.addr))
+    ['', '1', '2']
+
+There's also a "main program" version of the API:
+
+    >>> zc.resumelb.worker.get_resume_main(["%s:%s" % worker.addr])
+    ... # doctest: +ELLIPSIS
+    127.0.0.1:47094
+    {'': ...,
+     '1': ...,
+     '2': ...}
 
 Gracefull shutdown
 ==================
@@ -414,9 +434,9 @@ worker will load data from and save data to a file if the
 Note that we specified a max_skill_age of 4, rather than the default
 10x the history.
 
-    >>> from pprint import pprint
     >>> env = newenv('test', '/hi.html')
     >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> from pprint import pprint
     >>> pprint(read_message(worker_socket))
     (0, {'a': 1.0, 'b': 2.0})
 

@@ -4,12 +4,14 @@ import errno
 import gevent
 import gevent.hub
 import gevent.server
+import gevent.socket
 import gevent.threadpool
 import logging
 import marshal
 import os
 import sys
 import time
+import zc.parse_addr
 import zc.resumelb.util
 
 logger = logging.getLogger(__name__)
@@ -273,6 +275,20 @@ class Worker:
                 except zc.resumelb.util.Disconnected:
                     pass
 
+def get_resume(addr):
+    socket = gevent.socket.create_connection(addr)
+    rno, data = zc.resumelb.util.read_message(socket)
+    socket.close()
+    assert rno == 0, rno
+    return data
+
+def get_resume_main(args=None):
+    if args is None:
+        args = sys.argv[1:]
+    from pprint import pprint
+    for arg in args:
+        print arg
+        pprint(get_resume(zc.parse_addr.parse_addr(arg)), width=1)
 
 def server_runner(app, global_conf, address, **kw):
     # paste deploy hook

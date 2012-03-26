@@ -243,6 +243,19 @@ Change History
 0.2.0 (2012-03-??)
 ------------------
 
+- There's a new API for getting worker resumes, typically from
+  monitoring code::
+
+    >>> import zc.resume.worker
+    >>> print zc.resume.worker.get_resume(addr)
+
+  This is useful both for getting a worker's resume and for making
+  sure that the worker is accepting load-balancer connections.
+
+  There's also a scriot version of this::
+
+    bin/get-worker-resume 192.168.24.60:33161
+
 - The update settings methods were changed to revert settings to
   default when not provided.  This is especially important when used
   with ZooKeeper, so you can look at a tree and know what settings are

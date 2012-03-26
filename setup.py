@@ -24,6 +24,7 @@ entry_points = """
 [console_scripts]
 resumelb = zc.resumelb.lb:main
 zkresumelb = zc.resumelb.zk:lbmain
+get-worker-resume = zc.resumelb.worker:get_resume_main
 
 [paste.server_runner]
 main = zc.resumelb.worker:server_runner
