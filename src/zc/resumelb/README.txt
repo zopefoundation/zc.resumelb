@@ -1,5 +1,5 @@
 ===============================
-Resume-based WSGI load balancer
+Résumé-based WSGI load balancer
 ===============================
 
 This package provides a load balancer for WSGI applications that sorts
@@ -30,13 +30,13 @@ load balancers, are converted to WSGI environments and requests, in
 environment form, are handed over to workers over long-lived
 multi-plexed connections.
 
-Workers compute resumes, which are dictionaries mapping request
+Workers compute résumés, which are dictionaries mapping request
 classes to scores, which are average requests per second. Workers send
-load balancers their resumes periodically, and when load balancers
+load balancers their résumés periodically, and when load balancers
 connect to them.
 
 Multiple load balancers can be used for redundancy or load
-distribution.  Resumes are managed by workers to assure that load
+distribution.  Résumés are managed by workers to assure that load
 balancer's have the same information about worker skills.
 
 Status
@@ -106,11 +106,11 @@ address HOST:PORT
 
 history SIZE
    Roughly, the number of requests to consider when computing a
-   worker's resume.  This defaults to 9999.
+   worker's résumé.  This defaults to 9999.
 
 max_skill_age SIZE
    The maximum number of requests without a request in a request class
-   before a request class is dropped from a worker's resume.
+   before a request class is dropped from a worker's résumé.
 
    If not specified, this defaults to 10 times the history.
 
@@ -119,9 +119,9 @@ threads NTHREADS
    the given size is used to call the underlying WSGI stack.
 
 resume_file PATH
-   The path to a resume file.  Periodically, the worker's resume is
+   The path to a résumé file.  Periodically, the worker's résumé is
    saved to this file and the file is read on startup to initialize
-   the worker's resume.
+   the worker's résumé.
 
 tracelog LOGGER
    Request trace logging and specify the name of the Python logger to
@@ -195,9 +195,9 @@ threads NTHREADS
    the given size is used to call the underlying WSGI stack.
 
 resume_file PATH
-   The path to a resume file.  Periodically, the worker's resume is
+   The path to a résumé file.  Periodically, the worker's résumé is
    saved to this file and the file is read on startup to initialize
-   the worker's resume.
+   the worker's résumé.
 
 tracelog LOGGER
    Request trace logging and specify the name of the Python logger to
@@ -245,13 +245,13 @@ Change History
 0.2.0 (2012-03-27)
 ------------------
 
-- There's a new API for getting worker resumes, typically from
+- There's a new API for getting worker résumés, typically from
   monitoring code::
 
     >>> import zc.resume.worker
     >>> print zc.resume.worker.get_resume(addr)
 
-  This is useful both for getting a worker's resume and for making
+  This is useful both for getting a worker's résumé and for making
   sure that the worker is accepting load-balancer connections.
 
   There's also a scriot version of this::
