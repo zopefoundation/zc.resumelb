@@ -579,7 +579,7 @@ that the worker constructor caches datetime.now when writing to trace logs:
     >>> pprint(read_message(worker_socket))
     (0, {})
 
-By passing a threads object, we said we want a thread pool of size
+By passing a threads option, we said we want a thread pool of size
 one. This will serialize request processing.
 
 If a tracelog argument is passed a logger name, then trace logs will
@@ -593,38 +593,62 @@ be generated to the logger name.
 
 Now, we'll make some requests:
 
-    >>> write_message(worker_socket, 1, newenv('', '/sleep.html?dur=.1'))
+    >>> write_message(worker_socket, 11, newenv('', '/sleep.html?dur=.1'))
     >>> gevent.sleep(.01)
     B 1 2012-02-05 01:02:03.000456 GET /sleep.html?dur=.1
     >>> now += datetime.timedelta(microseconds=10000)
-    >>> write_message(worker_socket, 2, newenv('', '/sleep.html?dur=.1'))
+    >>> write_message(worker_socket, 22,
+    ...               newenv('', '/sleep.html?dur=.1&size=11'))
     >>> gevent.sleep(.01)
-    B 2 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1
+    B 2 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1&size=11
     >>> now += datetime.timedelta(microseconds=10000)
-    >>> write_message(worker_socket, 2, '')
+    >>> write_message(worker_socket, 22, '')
     >>> gevent.sleep(.01)
     I 2 2012-02-05 01:02:03.020456
     C 2 2012-02-05 01:02:03.020456
     >>> now += datetime.timedelta(microseconds=10000)
-    >>> write_message(worker_socket, 1, '')
+    >>> write_message(worker_socket, 11, '')
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
     I 1 2012-02-05 01:02:03.030456
     T 2 2012-02-05 01:02:03.030456 test
     - 2 2012-02-05 01:02:03.030456 test2
-    A 2 2012-02-05 01:02:03.030456 200 OK 12
+    A 2 2012-02-05 01:02:03.030456 200 OK 132
     C 1 2012-02-05 01:02:03.030456
     E 2 2012-02-05 01:02:03.030456
-    (2, ('200 OK', [('Content-Type', ...
-    >>> read_message(worker_socket)
-    (2, 'hello world\n')
-    >>> read_message(worker_socket)
-    (2, '')
+    (22, ('200 OK', [('Content-Length', ...
+
+    >>> while 1:
+    ...     rno, data = read_message(worker_socket)
+    ...     if rno != 22:
+    ...         print 'oops', rno
+    ...         break
+    ...     if not data: break
+
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
     T 1 2012-02-05 01:02:03.030456 test
     - 1 2012-02-05 01:02:03.030456 test2
     A 1 2012-02-05 01:02:03.030456 200 OK 12
     E 1 2012-02-05 01:02:03.030456
-    (1, ('200 OK', [...('Content-Length', '12')]))
+    (11, ('200 OK', [...('Content-Length', '12')]))
+
+Note that the tracelog request ids are distinct from the request
+numbers passed in the network protocol.  This is because network
+request numbers are assigned by load balancers and wouldn't be unique
+if there were multiple lbs.  Let's make a new connection, as we'll see
+this some more.
+
+    >>> now += datetime.timedelta(microseconds=10000)
+    >>> worker_socket2 = gevent.socket.create_connection(worker.addr)
+    >>> _ = read_message(worker_socket2)
+    >>> write_message(worker_socket2, 22, newenv('', '/hi.html'), '')
+    >>> read_message(worker_socket2) # doctest: +ELLIPSIS
+    B 3 2012-02-05 01:02:03.040456 GET /hi.html
+    I 3 2012-02-05 01:02:03.040456
+    C 3 2012-02-05 01:02:03.040456
+    A 3 2012-02-05 01:02:03.040456 200 OK 79
+    E 3 2012-02-05 01:02:03.040456
+    (22, ('200 OK', [('Content-Type', ...
+
 
 Also, note that the worker score is based on the time spent in app. It
 doesn't include time waiting.  We can see this when the worker sends
@@ -643,6 +667,8 @@ Cleanup:
 
     >>> logger.removeHandler(handler)
     >>> logger.setLevel(logging.NOTSET)
+    >>> worker_socket.close()
+    >>> worker_socket2.close()
     >>> worker.stop()
 
 Updating worker settings

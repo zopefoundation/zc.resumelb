@@ -55,7 +55,8 @@ class Worker:
         else:
             pool_apply = None
 
-        def call_app(rno, env):
+        self.trno = 0
+        def call_app(trno, env):
             response = [0]
             env['zc.resumelb.time'] = time.time()
             def start_response(status, headers, exc_info=None):
@@ -69,30 +70,30 @@ class Worker:
             no_message_format = '%s %s %s'
             message_format = '%s %s %s %s'
             now = datetime.datetime.now
-            def log(rno, code, message=None):
+            def log(trno, code, message=None):
                 if message:
-                    info(message_format, code, rno, now(), message)
+                    info(message_format, code, trno, now(), message)
                 else:
-                    info(no_message_format, code, rno, now())
+                    info(no_message_format, code, trno, now())
             tracelog = log
 
             class ApplicationTraceLog(object):
 
-                def __init__(self, rno):
-                    self.rno = rno
+                def __init__(self, trno):
+                    self.trno = trno
 
                 def log(self, msg=None, code='-'):
-                    log(self.rno, code, msg)
+                    log(self.trno, code, msg)
 
 
-            def call_app_w_tracelog(rno, env):
-                log(rno, 'C')
-                env[tracelog_key] = ApplicationTraceLog(rno)
-                response, body = call_app(rno, env)
+            def call_app_w_tracelog(trno, env):
+                log(trno, 'C')
+                env[tracelog_key] = ApplicationTraceLog(trno)
+                response, body = call_app(trno, env)
                 content_length = [v for (h, v) in response[1]
                                   if h.lower() == 'content-length']
                 content_length = content_length[-1] if content_length else '?'
-                log(rno, 'A', "%s %s" % (response[0], content_length))
+                log(trno, 'A', "%s %s" % (response[0], content_length))
                 def body_iter():
                     try:
                         for data in body:
@@ -100,18 +101,18 @@ class Worker:
                     finally:
                         if hasattr(body, 'close'):
                             body.close()
-                        log(rno, 'E')
+                        log(trno, 'E')
                 return response, body_iter()
 
             if threads:
-                def call_app_w_threads(rno, env):
-                    log(rno, 'I', env.get('CONTENT_LENGTH', 0))
-                    return pool_apply(call_app_w_tracelog, (rno, env))
+                def call_app_w_threads(trno, env):
+                    log(trno, 'I', env.get('CONTENT_LENGTH', 0))
+                    return pool_apply(call_app_w_tracelog, (trno, env))
                 self.call_app = call_app_w_threads
             else:
                 self.call_app = call_app_w_tracelog
         elif threads:
-            self.call_app = lambda rno, env: pool_apply(call_app, (rno, env))
+            self.call_app = lambda trno, env: pool_apply(call_app, (trno, env))
         else:
             self.call_app = call_app
 
@@ -183,11 +184,15 @@ class Worker:
     def handle(self, conn, rno, get, env):
         try:
             if self.tracelog:
+                self.trno += 1
+                trno = self.trno
                 query_string = env.get('QUERY_STRING')
                 url = env['PATH_INFO']
                 if query_string:
                     url += '?' + query_string
-                self.tracelog(rno, 'B', '%s %s' % (env['REQUEST_METHOD'], url))
+                self.tracelog(trno, 'B', '%s %s' % (env['REQUEST_METHOD'], url))
+            else:
+                trno = 0
 
             env['wsgi.errors'] = sys.stderr
 
@@ -205,7 +210,7 @@ class Worker:
             f.seek(0)
             env['wsgi.input'] = f
 
-            response, body = self.call_app(rno, env)
+            response, body = self.call_app(trno, env)
             try:
                 requests = conn.readers
                 if rno not in requests:

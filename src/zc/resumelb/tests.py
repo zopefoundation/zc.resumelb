@@ -55,12 +55,21 @@ def sneaky():
         content_length=12)
 
 @bobo.query('/sleep.html')
-def sleep(bobo_request, dur=0):
+def sleep(bobo_request, dur=0, size=1):
     time.sleep(float(dur))
     if 'tracelog' in bobo_request.environ:
         bobo_request.environ['tracelog'].log('test', 'T')
         bobo_request.environ['tracelog'].log('test2')
-    return 'hello world\n'
+
+    size = int(size)
+    if size > 1:
+        r = webob.Response()
+        r.app_iter = ('hello world\n' for i in range(size))
+        r.content_length = 12*size
+        r.content_type = 'text/html'
+        return r
+    else:
+        return 'hello world\n'
 
 @bobo.query('/gsleep.html')
 def gsleep(dur=0):
