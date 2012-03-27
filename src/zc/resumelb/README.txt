@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.2.0 (2012-03-??)
+0.2.0 (2012-03-27)
 ------------------
 
 - There's a new API for getting worker resumes, typically from
@@ -269,6 +269,9 @@ Change History
   without knowing the change history.
 
 - Added graceful load-balancer and worker shutdown on SIGTERM.
+
+- Fixed: trace log request ids weren't assigned correctly when using
+  multiple load balancers.
 
 - Added packaging meta data to help find gevent 1.0b1
   (which is at http://code.google.com/p/gevent/downloads/list)
