@@ -40,6 +40,8 @@ with open(
     with open(os.path.join(here, 'README.txt'), 'w') as outp:
         outp.write(inp.read())
 
+long_description = open('README.txt').read().decode('latin-1').encode('utf-8')
+
 from setuptools import setup
 
 setup(
@@ -48,8 +50,8 @@ setup(
     license = 'ZPL 2.1',
 
     name = name, version = version,
-    long_description=open('README.txt').read(),
-    description = open('README.txt').read().strip().split('\n')[0],
+    long_description=long_description,
+    description = long_description.strip().split('\n')[1],
     packages = [name.split('.')[0], name],
     namespace_packages = [name.split('.')[0]],
     package_dir = {'': 'src'},
