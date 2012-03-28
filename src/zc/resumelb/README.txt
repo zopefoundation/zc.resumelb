@@ -242,6 +242,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.3.0 (2012-03-28)
+------------------
+
+Change the way the zkresumelb (load-balancer program that works with
+ZooKeeper) handles access logs. Now, you pass a Python logging package
+logger name.  If you don't pass anything, then nothing will be logged.
+
 0.2.0 (2012-03-27)
 ------------------
 

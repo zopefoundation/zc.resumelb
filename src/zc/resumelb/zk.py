@@ -95,11 +95,7 @@ def lbmain(args=None, run=True):
         '-a', '--address', default=':0',
         help="Address to listed on for web requests"
         )
-    parser.add_option(
-        '-l', '--access-log', default='-',
-        help='Access-log path.\n\n'
-        'Use - (default) for standard output.\n'
-        )
+    parser.add_option('-l', '--access-logger', help='Access-log logger name.')
     parser.add_option(
         '-b', '--backlog', type='int',
         help="Server backlog setting.")
@@ -196,9 +192,10 @@ def lbmain(args=None, run=True):
     else:
         spawn = 'default'
 
-    accesslog = options.access_log
-    if isinstance(accesslog, str):
-        accesslog = sys.stdout if accesslog == '-' else open(accesslog, 'a')
+    if options.access_logger:
+        accesslog = AccessLog(options.access_logger)
+    else:
+        accesslog = None
 
     server = gevent.pywsgi.WSGIServer(
         addr, lb.handle_wsgi, backlog = options.backlog,
@@ -256,4 +253,9 @@ def lbmain(args=None, run=True):
             zk.close()
     else:
         gevent.sleep(.01)
-        return lb, server, accesslog
+        return lb, server
+
+class AccessLog:
+
+    def __init__(self, logger):
+        self.write = logging.getLogger(logger).info

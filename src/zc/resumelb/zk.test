@@ -184,9 +184,8 @@ string, the string is split and testing mode (run=False) is assumed.
       -h, --help            show this help message and exit
       -a ADDRESS, --address=ADDRESS
                             Address to listed on for web requests
-      -l ACCESS_LOG, --access-log=ACCESS_LOG
-                            Access-log path.  Use - (default) for
-                            standard output.
+      -l ACCESS_LOGGER, --access-logger=ACCESS_LOGGER
+                            Access-log logger name.
       -b BACKLOG, --backlog=BACKLOG
                             Server backlog setting.
       -d, --backdoor        Run a backdoor server. Use with caution!
@@ -215,14 +214,10 @@ Let's start with a simple call:
 
 
     >>> gevent.signal.reset_mock()
-    >>> lb, server, accesslog = zc.resumelb.zk.lbmain(
+    >>> lb, server = zc.resumelb.zk.lbmain(
     ...     'zookeeper.example.com:2181 /test/lb -s :0')
 
     >>> sig, sighandler = gevent.signal.call_args[0]
-
-    >>> import sys
-    >>> accesslog is sys.stdout
-    True
 
 At this point, the lb is running and listening on all interfaces using
 a self assigned port.
@@ -256,7 +251,6 @@ Then we'll make a simpler GET request:
     ... ''')
 
     >>> print sock.recv(9999) # doctest: +ELLIPSIS
-    127.0.0.1 - - [2012-01-28 15:29:30] "GET /hi.html HTTP/1.0" 200 226 0.002349
     HTTP/1.0 200 OK...
 
 If we create another worker, it will be seen by the load
@@ -340,9 +334,9 @@ the options!
     ...   f.write("oops")
 
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
-    ...     lb, server, accesslog = zc.resumelb.zk.lbmain(
+    ...     lb, server = zc.resumelb.zk.lbmain(
     ...         'zookeeper.example.com:2181 /test/lb'
-    ...         ' -alocalhost:0 -laccess.log -b1 -m1'
+    ...         ' -alocalhost:0 -laccess -b1 -m1'
     ...         ' --logger-configuration log.conf '
     ...         ' -rzc.resumelb.tests:test_classifier -eoops.html'
     ...         )
@@ -370,6 +364,12 @@ the options!
 The 3rd collection failed because we said to only accept one
 connection at a time and set the backlog to 1.
 
+We specified a logger name for the access log.  Let's set up a log
+handler, so we can verify that accesses were logged there.
+
+    >>> import zope.testing.loggingsupport
+    >>> accesslog = zope.testing.loggingsupport.InstalledHandler('access')
+
 Let's do a request.
 
     >>> sock.sendall('''GET /hi.html HTTP/1.0\r
@@ -383,13 +383,15 @@ Let's do a request.
     >>> sock.close()
     >>> sock2.close()
 
-We didn't get an access log entry in the output, because it's in the
-access log.
+We now have access-log records in the access-log handler:
 
-    >>> accesslog.flush()
-    >>> with open('access.log') as f:
-    ...     print f.read(),
-    127.0.0.1 - - [2012-01-29 14:11:37] "GET /hi.html HTTP/1.0" 200 226 0.001074
+    >>> print accesslog # doctest: +NORMALIZE_WHITESPACE
+    access INFO
+      127.0.0.1 - -
+      [2012-03-28 13:57:58] "GET /hi.html HTTP/1.0" 200 226 0.034563
+
+
+    >>> accesslog.uninstall()
 
 By looking at the lb's pool's skilled data structure, we can see that
 the test request classifier was used.
@@ -433,14 +435,11 @@ Finally, let's test that:
     ...     zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
     ...     address='127.0.0.1:0')
 
-    >>> import StringIO
-    >>> accesslog = StringIO.StringIO()
-
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     lb_greenlet = gevent.spawn(zc.resumelb.zk.lbmain, [
     ...       '-a127.0.0.1:0', '--logger-configuration', 'INFO',
-    ...       '-l', accesslog, 'zookeeper.example.com:2181', '/test/lb'])
+    ...       'zookeeper.example.com:2181', '/test/lb'])
     ...     gevent.sleep(.1)
     ...     if configureLoggers.called: print 'configureLoggers'
     ...     basicConfig.assert_called_with(level=20)
@@ -456,9 +455,6 @@ Finally, let's test that:
     >>> print sock.recv(9999) # doctest: +ELLIPSIS
     HTTP/1.0 200 OK...
 
-    >>> print accesslog.getvalue(),
-    127.0.0.1 - - [2012-01-31 07:46:31] "GET /hi.html HTTP/1.0" 200 226 0.001165
-
     >>> server.stop()
     >>> lb.stop()
 
@@ -468,7 +464,7 @@ Try a numeric log level:
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     lb_greenlet = gevent.spawn(zc.resumelb.zk.lbmain, [
     ...       '-a127.0.0.1:0', '--logger-configuration', '42',
-    ...       '-l', accesslog, 'zookeeper.example.com:2181', '/test/lb'])
+    ...       'zookeeper.example.com:2181', '/test/lb'])
     ...     gevent.sleep(.1)
     ...     if configureLoggers.called: print 'configureLoggers'
     ...     basicConfig.assert_called_with(level=42)
