@@ -242,6 +242,14 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.4.0 (2012-04-23)
+------------------
+
+- Change the load-balancing algorithm to take backlogs of
+  underutilized workers into account to allow a lower variance
+  parameter to be used, which allows new workers to be better
+  utilized.
+
 0.3.0 (2012-03-28)
 ------------------
 

@@ -27,7 +27,7 @@ We have some workers running. Now, let's create a load balancer:
 
     >>> import zc.resumelb.lb
     >>> lb = zc.resumelb.lb.LB([w.addr for w in workers],
-    ...                        zc.resumelb.lb.host_classifier)
+    ...                        zc.resumelb.lb.host_classifier, variance=4)
 
 Note that the lb provides an interface for changing pool
 settings. This is just a link to the pool's update_settings method:

@@ -774,3 +774,12 @@ With a decay of .5:
 
     >>> read_message(worker_socket)
     (0, {'test': 0.875})
+
+Cleanup:
+
+    >>> worker.stop()
+
+File results
+============
+
+Workers support 

@@ -16,14 +16,15 @@ We'll test the pool with stand-ins for the local workers.
 
     >>> import zc.resumelb.lb
     >>> pool = zc.resumelb.lb.Pool(
-    ...     variance=2.5, backlog_history=2, unskilled_score=.5)
+    ...     variance=1.5, backlog_history=2, unskilled_score=.5)
 
 We specified a number of optional parameters that we'll see in action
 later:
 
 variance
    How many times the pool mean backlog we'll let a worker's backlog
-   rise before we look for another worker. The default is 4.
+   rise above the minimum backlog [#almostminimum]_ before we look for
+   another worker.  The default is 1.
 
 backlog_history
    The (approximate) number of requests to include in the mean backlog
@@ -60,8 +61,8 @@ We didn't get a worker (we timed out), because we haven't added one.
 
     >>> pool.new_resume(w1, {})
 
-   >>> pool.get('foo', 0.0)
-   w1
+    >>> pool.get('foo', 0.0)
+    w1
 
 This time, we got the one we registered.
 
@@ -106,7 +107,7 @@ Let's add another worker:
     >>> w3 = Worker('w3')
     >>> pool.new_resume(w3, {})
 
-and make some more foo requests:
+and make another foo request:
 
     >>> [pool.get('foo') for i in range(2)]
     [w1, w1]
@@ -280,7 +281,7 @@ Updating worker settings
     >>> pool.new_resume(w2, {'bar': 2.0, 'foo': 2.0})
     >>> pool.new_resume(w3, {'foo': 3.8})
     >>> pool.variance, pool.backlog_history, pool.unskilled_score
-    (4.0, 9, 1.0)
+    (1.0, 9, 1.0)
     >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
     (0.944..., 0.981...)
 
@@ -301,7 +302,7 @@ Note that settings revert to their default values when not specified:
 
     >>> pool.update_settings({})
     >>> pool.variance, pool.backlog_history, pool.unskilled_score
-    (4.0, 9, 1.0)
+    (1.0, 9, 1.0)
     >>> pool.worker_decay, pool.decay # doctest: +ELLIPSIS
     (0.944..., 0.981...)
 
@@ -316,3 +317,43 @@ Settings are automatically coerced to their expected types:
     ... dict(variance='2', backlog_history='7', unskilled_score='1'))
     >>> pool.variance, pool.backlog_history, pool.unskilled_score
     (2.0, 7, 1.0)
+
+Using new workers
+=================
+
+Under heavy load, we should be able to add a worker and have it get
+used immediately.
+
+    >>> pool.update_settings(dict(variance=1))
+    >>> pool.new_resume(w1, {'bar': 2.0})
+    >>> pool.new_resume(w2, {'bar': 2.0})
+    >>> pool.new_resume(w3, {'bar': 2.0})
+    >>> _ = [pool.get('bar') for i in range(30)]
+
+    >>> pool # doctest: +ELLIPSIS
+    Request classes:
+      bar: w1(2.0,5.96898355541), w2(2.0,5.96898355541), w3(2.0,5.96898355541)
+      foo: 
+    Backlogs:
+      overall backlog: 30 Decayed: 16.8930595654 Avg: 5.63101985512
+      10: [w1, w2, w3]
+
+Now, we'll add a new worker:
+
+    >>> w6 = Worker('w6')
+    >>> pool.new_resume(w6, {})
+
+And wen we make a request, it will go to the new worker:
+
+    >>> pool.get('bar')
+    w6
+
+Note that we used a variance of 1.  Unfortunately, if we use a higher
+variance, new individual workers won't get added.  However, using so
+low a variance will tend to cause work to spread out over multiple
+workers, rather than being limited to a few.
+
+
+.. [#almostminimum] We use the backlog of the least-recently-used
+   worker as an approximation of the minumun backlog.
+

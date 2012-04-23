@@ -115,7 +115,7 @@ class Pool:
 
     _meta_settings = dict(
         unskilled_score=1.0,
-        variance=4.0,
+        variance=1.0,
         backlog_history=9
         )
 
@@ -224,8 +224,9 @@ class Pool:
             skilled = self.skilled[rclass] = set()
 
         max_backlog = max(self.variance * self.mbacklog / self.nworkers, 1)
+        min_backlog = unskilled.first.value.mbacklog + 1
         for score, worker in skilled:
-            if worker.mbacklog > max_backlog:
+            if (worker.mbacklog - min_backlog) > max_backlog:
                 continue
             backlog = worker.backlog + 1
             score /= backlog
