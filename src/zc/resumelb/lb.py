@@ -7,6 +7,7 @@ import llist
 import logging
 import re
 import sys
+import time
 import webob
 import zc.parse_addr
 import zc.resumelb.util
@@ -279,6 +280,7 @@ class Worker(zc.resumelb.util.Worker):
     def __init__(self, pool, socket, addr):
         self.pool = pool
         self.nrequest = 0
+        self.requests = {}
         self.__name__ = '%s:%s' % addr
 
         readers = self.connected(socket, addr)
@@ -300,6 +302,11 @@ class Worker(zc.resumelb.util.Worker):
                 else:
                     reader(data)
 
+    @property
+    def oldest_time(self):
+        if self.requests:
+            return min(self.requests.itervalues())
+
     def __repr__(self):
         return self.__name__
 
@@ -313,46 +320,51 @@ class Worker(zc.resumelb.util.Worker):
 
         rno = self.nrequest + 1
         self.nrequest = rno % self.maxrno
-        get = self.start(rno)
+        self.requests[rno] = time.time()
         try:
-            self.put((rno, env))
-            content_length = int(env.get('CONTENT_LENGTH', 0))
-            while content_length > 0:
-                data = input.read(min(content_length, block_size))
-                if not data:
-                    # Browser disconnected, cancel the request
-                    self.put((rno, None))
-                    self.end(rno)
-                    return
-                content_length -= len(data)
-                self.put((rno, data))
-            self.put((rno, ''))
-
-            data = get()
-            if data is None:
-                raise zc.resumelb.util.Disconnected()
-            logger.debug('start_response %r', data)
-            start_response(*data)
-        except:
-            # not using finally here, because we only want to end on error
-            self.end(rno)
-            raise
-
-        def content():
+            get = self.start(rno)
             try:
-                while 1:
-                    data = get()
-                    if data:
-                        logger.debug('yield %r', data)
-                        yield data
-                    else:
-                        if data is None:
-                            logger.warning('Disconnected while returning body')
-                        break
-            finally:
-                self.end(rno)
+                self.put((rno, env))
+                content_length = int(env.get('CONTENT_LENGTH', 0))
+                while content_length > 0:
+                    data = input.read(min(content_length, block_size))
+                    if not data:
+                        # Browser disconnected, cancel the request
+                        self.put((rno, None))
+                        self.end(rno)
+                        return
+                    content_length -= len(data)
+                    self.put((rno, data))
+                self.put((rno, ''))
 
-        return content()
+                data = get()
+                if data is None:
+                    raise zc.resumelb.util.Disconnected()
+                logger.debug('start_response %r', data)
+                start_response(*data)
+            except:
+                # not using finally here, because we only want to end on error
+                self.end(rno)
+                raise
+
+            def content():
+                try:
+                    while 1:
+                        data = get()
+                        if data:
+                            logger.debug('yield %r', data)
+                            yield data
+                        else:
+                            if data is None:
+                                logger.warning(
+                                    'Disconnected while returning body')
+                            break
+                finally:
+                    self.end(rno)
+
+            return content()
+        finally:
+            del self.requests[rno]
 
     def disconnected(self):
         self.pool.remove(self)

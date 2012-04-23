@@ -219,7 +219,11 @@ def lbmain(args=None, run=True):
                     backlog = pool.backlog,
                     mean_backlog = pool.mbacklog,
                     workers = [
-                        (worker.__name__, worker.backlog, worker.mbacklog)
+                        (worker.__name__,
+                         worker.backlog,
+                         worker.mbacklog,
+                         worker.oldest_time
+                         )
                         for worker in sorted(
                             pool.workers, key=lambda w: w.__name__)
                         ]

@@ -239,7 +239,6 @@ All of the addresses are ips, not hostnames. None of them include localhost:
     ...  if a.startswith('localhost:')]
     []
 
-
 Then we'll make a simpler GET request:
 
     >>> import gevent.socket
@@ -291,8 +290,10 @@ server is registered with ZooKeeper:
                    0,
                    ...]]}
 
-    >>> sorted(status['workers'], key=lambda w: w[2]) # doctest: +ELLIPSIS
-    [[u'127.0.0.1:...', 0, 0], [u'127.0.0.1:...', 0, 0.48...]]
+    >>> sorted(status['workers'], key=lambda w: w[2])
+    ... # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [[u'127.0.0.1:...', 0, 0, None],
+     [u'127.0.0.1:...', 0, 0.48..., None]]
 
     >>> status_file.close()
     >>> status_socket.close()

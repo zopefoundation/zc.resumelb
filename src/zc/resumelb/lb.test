@@ -237,6 +237,61 @@ Workers use their addresses as their reprs.
       overall backlog: 0 Decayed: 1.47809138734 Avg: 0.73904569367
       0: [127.0.0.1:0, 127.0.0.1:0]
 
+Worker oldest-request start times
+=================================
+
+For monitoring purposes, we want to know about requests that take a
+very long time.  Load-balancer worker objects keep track of
+outstanding requests.  We can query this information:
+
+    >>> for worker in sorted(lb.pool.workers):
+    ...     print worker, worker.oldest_time
+    127.0.0.1:0 None
+    127.0.0.1:0 None
+
+    >>> import time
+    >>> t1 = time.time()
+    >>> app1 = webtest.TestApp(lb.handle_wsgi)
+    >>> g1 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
+    >>> rno = read_message(worker1)[0]
+    >>> read_message(worker1) == (rno, '')
+    True
+
+    >>> t2 = time.time()
+    >>> [ot] = [w.oldest_time for (_, w) in lb.pool.skilled['h1.com']]
+    >>> t1 <= ot <= t2
+    True
+
+    >>> gevent.sleep(.01)
+    >>> app2 = webtest.TestApp(lb.handle_wsgi)
+    >>> g2 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
+    >>> gevent.sleep(.01)
+    >>> [ot] == [w.oldest_time for (_, w) in lb.pool.skilled['h1.com']]
+    True
+
+    >>> response = webob.Response('Hello world\n')
+    >>> write_message(worker1, rno, (response.status, response.headers.items()))
+    >>> write_message(worker1, rno, response.body)
+    >>> write_message(worker1, rno, '')
+    >>> g1.join()
+    >>> [ot2] = [w.oldest_time for (_, w) in lb.pool.skilled['h1.com']]
+    >>> ot2 > ot
+    True
+
+    >>> rno = read_message(worker1)[0]
+    >>> read_message(worker1) == (rno, '')
+    True
+    >>> response = webob.Response('Hello world\n')
+    >>> write_message(worker1, rno, (response.status, response.headers.items()))
+    >>> write_message(worker1, rno, response.body)
+    >>> write_message(worker1, rno, '')
+    >>> g2.join()
+
+    >>> for worker in sorted(lb.pool.workers):
+    ...     print worker, worker.oldest_time
+    127.0.0.1:0 None
+    127.0.0.1:0 None
+
 
 Worker disconnection
 ====================
@@ -260,18 +315,18 @@ disconnects, that response is simply truncated.
     ...     if rno2 != rno or blank != '':
     ...         print 'oops', (rno2, blank)
     ...     print rno, type(data)
-    3 <type 'dict'>
-    4 <type 'dict'>
     5 <type 'dict'>
     6 <type 'dict'>
     7 <type 'dict'>
     8 <type 'dict'>
     9 <type 'dict'>
     10 <type 'dict'>
+    11 <type 'dict'>
+    12 <type 'dict'>
 
 Now, let's send a partial response from the first GET:
 
-    >>> write_message(worker1, 3, ('200 OK', [
+    >>> write_message(worker1, 5, ('200 OK', [
     ...   ('Content-Length', '42'), ('Content-Type', 'text/html')]))
     >>> gevent.sleep(.01)
 
