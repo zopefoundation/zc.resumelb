@@ -228,8 +228,9 @@ class Pool:
         for score, worker in skilled:
             if (worker.mbacklog - min_backlog) > max_backlog:
                 continue
-            backlog = worker.backlog + 1
-            score /= backlog
+            backlog = worker.backlog
+            if backlog > 1:
+                score /= backlog
             if (score > best_score):
                 best_score = score
                 best_worker = worker

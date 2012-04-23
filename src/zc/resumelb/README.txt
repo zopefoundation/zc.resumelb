@@ -250,6 +250,12 @@ Change History
   parameter to be used, which allows new workers to be better
   utilized.
 
+- Changed the load-balancing algorithm to try just a little bit harder
+  to keep work with skilled workers by not penalizing workers for
+  their first outstanding request. (In other words, when adjusting
+  worker scrores chacking a maximum backlog, we subtract 1 from the
+  worker's backlog if it's non-zero.
+
 0.3.0 (2012-03-28)
 ------------------
 

@@ -174,9 +174,9 @@ went to that worker because it was skilled and had a fairly low backlog.
 
 When a worker is done doing its work, we put it back in the pool:
 
-    >>> for i in range(8):
+    >>> for i in range(7):
     ...     pool.put(w1)
-    >>> for i in range(8):
+    >>> for i in range(7):
     ...     pool.put(w3)
 
     >>> pool # doctest: +ELLIPSIS
@@ -184,7 +184,7 @@ When a worker is done doing its work, we put it back in the pool:
       bar: w2(0.5,1.0)
       foo: w1(0.5,2.29...), w3(0.5,2.29...), w5(0.5,1.57...)
     Backlogs:
-      overall backlog: 1 Decayed: 8.41... Avg: 1.68...
+      overall backlog: 3 Decayed: 9.41... Avg: 1.88...
       0: [w1, w3, w4]
       1: [w2]
       2: [w5]
@@ -198,44 +198,43 @@ Now that we've done some work, let's update the resumes.  This will
 normally be done by workers periodically, after collecting performance
 data.
 
-    >>> pool.new_resume(w1, {'foo': 6.0})
+    >>> pool.new_resume(w1, {'foo': 5.9})
     >>> pool.new_resume(w2, {'bar': 2.0, 'foo': 2.0})
     >>> pool.new_resume(w3, {'foo': 3.8})
 
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.29...), w1(6.0,1.96...)
+      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.29...), w1(5.9,1.96...)
     Backlogs:
-      overall backlog: 2 Decayed: 8.00... Avg: 1.60...
+      overall backlog: 4 Decayed: 9.0... Avg: 1.8...
       0: [w3, w4]
       1: [w1, w2]
       2: [w5]
 
     >>> pool.get('foo')
+    w1
+    >>> pool.get('foo')
     w3
     >>> pool.get('foo')
-    w1
-    >>> pool.get('foo')
-    w1
+    w3
 
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,1.96...), w1(6.0,2.23...)
+      foo: w5(0.5,1.5...), w2(2.0,1.0), w3(3.8,1.97...), w1(5.9,1.9...)
     Backlogs:
-      overall backlog: 5 Decayed: 7.31... Avg: 1.46...
+      overall backlog: 7 Decayed: 8.5... Avg: 1.7...
       0: [w4]
-      1: [w2, w3]
-      2: [w5]
-      3: [w1]
+      1: [w2]
+      2: [w1, w3, w5]
 
-    >>> pool.get('foo')
-    w3
     >>> pool.get('foo')
     w1
     >>> pool.get('foo')
-    w3
+    w2
+    >>> pool.get('foo')
+    w1
 
     >>> pool.put(w1)
     >>> pool.put(w3)
@@ -245,17 +244,16 @@ data.
     >>> pool.put(w3)
     >>> pool # doctest: +ELLIPSIS
     Request classes:
-      bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,1.40...), w1(6.0,2.75...)
+      bar: w2(2.0,1.5...)
+      foo: w5(0.5,1.5...), w2(2.0,1.5...), w3(3.8,1.2...), w1(5.9,2.7...)
     Backlogs:
-      overall backlog: 2 Decayed: 6.39... Avg: 1.27...
+      overall backlog: 4 Decayed: 7.9... Avg: 1.5...
       0: [w3, w4]
-      1: [w2]
-      2: [w5]
+      2: [w2, w5]
       3: [w1]
 
     >>> [pool.get('foo') for i in range(5)]
-    [w3, w3, w1, w3, w2]
+    [w3, w3, w1, w3, w1]
 
 Worker disconnect
 =================
@@ -269,7 +267,7 @@ When a worker disconnect, it's removed from the pool:
       bar: w2(2.0,1.57...)
       foo: w5(0.5,1.57...), w2(2.0,1.57...)
     Backlogs:
-      overall backlog: 0 Decayed: 5.57... Avg: 1.85...
+      overall backlog: 1 Decayed: 7.1... Avg: 2.3...
       0: [w4]
       2: [w2, w5]
 
