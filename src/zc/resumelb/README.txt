@@ -256,6 +256,9 @@ Change History
   worker scrores chacking a maximum backlog, we subtract 1 from the
   worker's backlog if it's non-zero.
 
+- The status server provided when using ZooKeeper now listens on a
+  unix-domain socket.
+
 - The status server provided when using ZooKeeper now includes the
   start time of the oldest request for each worker, to be used for
   monitoring.

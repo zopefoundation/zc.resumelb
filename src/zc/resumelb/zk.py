@@ -16,11 +16,13 @@
 import gevent
 import gevent.pool
 import gevent.server
+import gevent.socket
 import json
 import logging
 import os
 import re
 import signal
+import socket
 import sys
 import zc.parse_addr
 import zc.zk
@@ -108,7 +110,7 @@ def lbmain(args=None, run=True):
     parser.add_option(
         '-s', '--status-server',
         help=("Run a status server for getting pool information. "
-              "The argument is an address to listen on."))
+              "The argument is a unix-domain socket path to listen on."))
     parser.add_option(
         '-L', '--logger-configuration',
         help=
@@ -230,12 +232,15 @@ def lbmain(args=None, run=True):
                     ))+'\n')
             writer.close()
             socket.close()
-        status_server_address = zc.parse_addr.parse_addr(options.status_server)
-        status_server = gevent.server.StreamServer(
-            status_server_address, status)
+
+        status_server_address = options.status_server
+        if os.path.exists(status_server_address):
+            os.remove(status_server_address)
+        sock = gevent.socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(status_server_address)
+        sock.listen(5)
+        status_server = gevent.server.StreamServer(sock, status)
         status_server.start()
-        registration_data['status'] = "%s:%s" % (
-            status_server_address[0], status_server.server_port)
 
     zk.register_server(path+'/providers', (addr[0], server.server_port),
                        **registration_data)

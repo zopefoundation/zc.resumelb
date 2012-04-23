@@ -194,8 +194,8 @@ string, the string is split and testing mode (run=False) is assumed.
                             connections.
       -s STATUS_SERVER, --status-server=STATUS_SERVER
                             Run a status server for getting pool
-                            information. The argument is an address to
-                            listen on.
+                            information. The argument is a unix-domain
+                            socket path to listen on.
       -L LOGGER_CONFIGURATION, --logger-configuration=LOGGER_CONFIGURATION
                             Read logger configuration from the given
                             configuration file path.  The configuration
@@ -215,7 +215,7 @@ Let's start with a simple call:
 
     >>> gevent.signal.reset_mock()
     >>> lb, server = zc.resumelb.zk.lbmain(
-    ...     'zookeeper.example.com:2181 /test/lb -s :0')
+    ...     'zookeeper.example.com:2181 /test/lb -s status.sock')
 
     >>> sig, sighandler = gevent.signal.call_args[0]
 
@@ -271,12 +271,9 @@ LB status server
 When we started the lb, we told it to create a status server.  The
 server is registered with ZooKeeper:
 
-    >>> status_addr = zc.parse_addr.parse_addr(
-    ...     zk.get_properties(
-    ...         '/test/lb/providers/' +
-    ...         zk.get_children('/test/lb/providers')[0])['status'])
-    >>> status_socket = gevent.socket.create_connection(
-    ...     ('127.0.0.1', status_addr[1]))
+    >>> import socket
+    >>> status_socket = gevent.socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    >>> status_socket.connect('status.sock')
     >>> status_file = status_socket.makefile()
     >>> import json
     >>> status = json.loads(status_file.read())
