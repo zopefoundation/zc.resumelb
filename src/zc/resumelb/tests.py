@@ -24,6 +24,7 @@ import re
 import time
 import unittest
 import webob
+import zc.resumelb.worker
 import zc.zk.testing
 import zope.testing.setupstack
 import zope.testing.wait
@@ -91,6 +92,11 @@ def setUp(test):
     global pid
     pid = 6115
     test.globs['wait'] = zope.testing.wait.Wait(getsleep=lambda : gevent.sleep)
+    old_STRING_BUFFER_SIZE = zc.resumelb.worker.STRING_BUFFER_SIZE
+    zope.testing.setupstack.register(
+        test, setattr, zc.resumelb.worker,
+        'STRING_BUFFER_SIZE', old_STRING_BUFFER_SIZE)
+    zc.resumelb.worker.STRING_BUFFER_SIZE = 9999
 
 def zkSetUp(test):
     setUp(test)

@@ -116,9 +116,12 @@ The worker will process the request and send back 3 records:
 
 We can have multiple outstanding requests:
 
-    >>> write_message(worker_socket, 2, newenv('', '/hi.html'))
-    >>> write_message(worker_socket, 3, newenv('1', '/hi.html'))
-    >>> write_message(worker_socket, 4, newenv('1', '/hi.html'))
+    >>> write_message(worker_socket, 2, newenv('', '/hi.html', dict(
+    ...     REQUEST_METHOD='POST', CONTENT_LENGTH='1000')))
+    >>> write_message(worker_socket, 3, newenv('1', '/hi.html', dict(
+    ...     REQUEST_METHOD='POST', CONTENT_LENGTH='10000')))
+    >>> write_message(worker_socket, 4, newenv('1', '/hi.html', dict(
+    ...     REQUEST_METHOD='POST', CONTENT_LENGTH='100000')))
 
 At this point, we have 3 outstanding requests.  Let's create 3 bodies:
 

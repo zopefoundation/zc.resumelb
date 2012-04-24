@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.4.0 (2012-04-23)
+0.4.0 (2012-04-24)
 ------------------
 
 - Change the load-balancing algorithm to take backlogs of
@@ -262,6 +262,9 @@ Change History
 - The status server provided when using ZooKeeper now includes the
   start time of the oldest request for each worker, to be used for
   monitoring.
+
+- Fixed: Workers buffered large request bodies in memory.  Now large
+  request bodies are buffered to disk.
 
 0.3.0 (2012-03-28)
 ------------------

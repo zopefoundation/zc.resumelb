@@ -10,6 +10,7 @@ import logging
 import marshal
 import os
 import sys
+import tempfile
 import time
 import zc.parse_addr
 import zc.resumelb.util
@@ -23,6 +24,8 @@ import traceback
 def error(mess):
     print >>sys.stderr, mess
     traceback.print_exc()
+
+STRING_BUFFER_SIZE = 9999999
 
 class Worker:
 
@@ -197,7 +200,11 @@ class Worker:
             env['wsgi.errors'] = sys.stderr
 
             # XXX We're buffering input. Maybe should to have option not to.
-            f = cStringIO.StringIO()
+            content_length = int(env.get('CONTENT_LENGTH', 0))
+            if content_length > STRING_BUFFER_SIZE:
+                f = tempfile.TemporaryFile(suffix='.rlbwi')
+            else:
+                f = cStringIO.StringIO()
             while 1:
                 data = get()
                 if data:
