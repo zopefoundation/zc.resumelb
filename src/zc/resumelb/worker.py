@@ -268,6 +268,9 @@ class Worker:
         except:
             error('handle_connection')
         finally:
+            f = env.get('wsgi.input')
+            if f is not None:
+                f.close()
             conn.end(rno)
 
     def new_resume(self, resume):
