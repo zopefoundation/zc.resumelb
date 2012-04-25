@@ -70,7 +70,25 @@ def writer(writeq, sock, multiplexer):
             multiplexer.disconnected()
             return
 
+class ByteSizedQueue(gevent.queue.Queue):
+
+    __size = 0
+
+    def _get(self):
+        item = super(ByteSizedQueue, self)._get()
+        self.__size -= len(item)
+        return item
+
+    def _put(self, item):
+        super(ByteSizedQueue, self)._put(item)
+        self.__size += len(item)
+
+    def qsize(self):
+        return self.__size
+
 class Worker:
+
+    write_queue_size = 99999
 
     def connected(self, socket, addr=None):
         if addr is None:
@@ -78,7 +96,7 @@ class Worker:
         logger.info('worker connected %s', addr)
         self.addr = addr
         self.readers = {}
-        writeq = gevent.queue.Queue(9)
+        writeq = ByteSizedQueue(self.write_queue_size)
         gevent.Greenlet.spawn(writer, writeq, socket, self)
         self.put = writeq.put
         self.is_connected = True

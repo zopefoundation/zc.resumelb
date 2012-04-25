@@ -524,7 +524,7 @@ cancellation before rending a response, because the app takes some time:
 
 Or requesting tons of data, but before receiving all of it:
 
-    >>> env = newenv('test', '/gen.html?size=1000')
+    >>> env = newenv('test', '/gen.html?size=10000')
     >>> write_message(worker_socket, 7, env, '')
     >>> gevent.sleep(.01)
     >>> write_message(worker_socket, 7, env, None)
@@ -540,7 +540,7 @@ back:
     >>> env = newenv('test', '/hi.html')
     >>> write_message(worker_socket, 8, env, '')
 
-Now, we'll read data until we get a response record for request 7:
+Now, we'll read data until we get a response record for request 8:
 
     >>> rno = 0
     >>> while rno != 8:

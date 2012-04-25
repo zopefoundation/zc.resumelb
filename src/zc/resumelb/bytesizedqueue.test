@@ -1,0 +1,64 @@
+byte-sized queues
+=================
+
+Internally, we have greenlets that handle communication over the
+multiplexed lb<->worker socket and pass data to and from request
+handlers::
+
+              - read queue <-- read greenlet <-
+             /                                  \
+   handler <-                   -----------> socket
+      \                       /
+        -> write queue -> write greenled
+
+Read queues are per worker.  The write queue is shared.  The read
+greenlet reads messages from the socket. Each message has a request
+number, which is used to look up a handler read queue.
+
+We limit write queue size to prevent storing lots of data in memory.
+When no more data can be written to the socket, we want to block
+handlers from adding more data to the queue.
+
+It's important though to limit by bytes, rather than by message count.
+We use ByteSizedQueue for this:
+
+    >>> import zc.resumelb.util
+    >>> q = zc.resumelb.util.ByteSizedQueue(999999)
+
+    >>> q.put('a'*900000, False)
+    >>> q.put('b'*99990, False)
+    >>> q.put('c'*99990, False)
+    >>> q.put('d'*99990, False)
+    Traceback (most recent call last):
+    ...
+    Full
+
+    >>> q.qsize()
+    1099980
+
+Note that the queue size is actually greater than the max size.  We
+don't raise full unless the size is greater than or equal to the max
+size before adding an item.
+
+    >>> q.get() == 'a'*900000
+    True
+    >>> q.put('d'*99990, False)
+    >>> q.put('a'*900000, False)
+    >>> q.put('x'*900000, False)
+    Traceback (most recent call last):
+    ...
+    Full
+
+    >>> q.get() == 'b'*99990
+    True
+    >>> q.get() == 'c'*99990
+    True
+    >>> q.get() == 'd'*99990
+    True
+    >>> q.qsize()
+    900000
+
+
+
+
+
