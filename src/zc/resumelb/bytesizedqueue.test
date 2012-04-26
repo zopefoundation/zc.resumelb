@@ -58,7 +58,47 @@ size before adding an item.
     >>> q.qsize()
     900000
 
+Empty strings
+-------------
 
+There's a corner case when a queue contains just empty strings.  At
+that point, it's byte size is 0, but it's queue size must be positive,
+or get will block.  For that reason, the queue will walways have an
+non-zeo queue size when there are items in it.
 
+    >>> q.put('')
+    >>> q.get() == 'a'*900000
+    True
+    >>> q.qsize() > 0
+    True
 
+    >>> q.put('')
+    >>> q.qsize() > 0
+    True
+    >>> q.get()
+    ''
+    >>> q.qsize() > 0
+    True
+    >>> q.get()
+    ''
+    >>> q.qsize()
+    0
+
+None
+----
+
+None is counted as an empty string:
+
+    >>> q.put(None)
+    >>> q.qsize() > 0
+    True
+    >>> q.put('hi')
+    >>> q.qsize()
+    2
+
+Actually, anything false is:
+
+    >>> q.put([])
+    >>> q.qsize()
+    2
 

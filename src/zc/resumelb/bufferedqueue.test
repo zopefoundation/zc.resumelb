@@ -1,0 +1,132 @@
+Bufferred Queues
+================
+
+The resumelb uses queues to interface between multiplexed worker
+connections and client web connections.  For very large responses, you
+could get into a situation where a worker sends data faster than a
+client can recieve it and the data ends up in a queue in
+memory. Specifically, this is the read queue used in a LB handler to
+get data from the the worker.  The handler only pulls data from this
+queue as fast as the WSGI server can send it to the client.  We don't
+want this queue to get backed up, as that will back up other requests
+on the **multiplexed** connection to the worker.
+
+In the LB, handlers have BufferedQueue read queues.  A buffered queue
+wraps a ByteSizedQueue and avoids blocking by writing data to a
+temporary file, if necessary.
+
+    >>> import zc.resumelb.util
+
+    >>> q = zc.resumelb.util.BufferedQueue()
+
+BufferedQueue only implements the ``put``, ``get``, and qsize queue methods.
+
+    >>> q.put('a')
+    >>> q.qsize()
+    1
+    >>> q.get()
+    'a'
+    >>> q.qsize()
+    0
+
+If it hasn't started bufferng yet, it doesn't have a close method:
+
+    >>> hasattr(q, 'close')
+    False
+
+In testing, the underlying queue max size is only 999 bytes.
+
+If we add 1000 bytes, we won't have triggered the buffering, due to
+the fact that the underlying ByteSizedQueue doesn't block until the
+bytes in the queue are over the limit:
+
+    >>> q.put('a'*1000)
+    >>> hasattr(q, 'close')
+    False
+
+    >>> q.put('b'*1000)
+    >>> hasattr(q, 'close')
+    True
+
+Now, we've triggered the buffering. We can keep adding data:
+
+    >>> q.put('c'*1000)
+    >>> q.put('d'*1000)
+    >>> q.put('e'*1000)
+    >>> q.qsize()
+    5000
+
+without blocking.  We can verify that the ByteSizedQueue only has 1000
+bytes by cheating. :)
+
+    >>> q.queue.queue.qsize()
+    1000
+
+The rest is in the file buffer.  Let's drain the queue, to verify we
+didn't lose anything.
+
+    >>> q.get() == 'a'*1000
+    True
+    >>> q.get() == 'b'*1000
+    True
+    >>> q.get() == 'c'*1000
+    True
+    >>> q.get() == 'd'*1000
+    True
+    >>> q.get() == 'e'*1000
+    True
+    >>> q.qsize()
+    0
+
+Let's fill it up again:
+
+    >>> q.put('f'*1000)
+    >>> q.put('g'*1000)
+    >>> q.put('h'*1000)
+    >>> q.put('i'*1000)
+    >>> q.put('j'*1000)
+
+At any point, we can close the queue, which will free resources and
+empty it:
+
+    >>> q.close()
+    >>> q.qsize()
+    0
+
+Being a little white box:
+
+    >>> q.queue.file.closed
+    True
+
+Now, if we put to the queue, it will simply discard the data:
+
+    >>> q.put('a')
+    >>> q.qsize()
+    0
+
+
+Empty strings, None, and other False objects
+--------------------------------------------
+
+    >>> q = zc.resumelb.util.BufferedQueue()
+    >>> q.put('')
+    >>> q.qsize() > 0
+    True
+    >>> q.get()
+    ''
+
+    >>> q.qsize()
+    0
+
+    >>> q.put('a'*1000)
+    >>> q.qsize()
+    1000
+
+    >>> q.put('')
+    >>> q.put(None)
+    >>> q.put(())
+    >>> q.qsize()
+    1000
+
+    >>> q.get() == 'a'*1000, q.get(), q.get(), q.get()
+    (True, '', None, ())

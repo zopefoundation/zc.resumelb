@@ -98,10 +98,10 @@ def setUp(test):
         test, setattr, zc.resumelb.worker, 'STRING_BUFFER_SIZE', old)
     zc.resumelb.worker.STRING_BUFFER_SIZE = 9999
 
-    old = zc.resumelb.util.Worker.write_queue_size
+    old = zc.resumelb.util.queue_size_bytes
     zope.testing.setupstack.register(
-        test, setattr, zc.resumelb.util.Worker, 'write_queue_size', old)
-    zc.resumelb.util.Worker.write_queue_size = 999
+        test, setattr, zc.resumelb.util, 'queue_size_bytes', old)
+    zc.resumelb.util.queue_size_bytes = 999
 
 def zkSetUp(test):
     setUp(test)
@@ -121,6 +121,7 @@ def test_suite():
                     ])
                 ) + manuel.capture.Manuel(),
             'lb.test', 'pool.test', 'worker.test', 'bytesizedqueue.test',
+            'bufferedqueue.test',
             setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
         manuel.testing.TestSuite(
             manuel.doctest.Manuel(

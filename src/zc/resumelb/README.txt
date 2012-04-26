@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.4.0 (2012-04-24)
+0.4.0 (2012-04-26)
 ------------------
 
 - Change the load-balancing algorithm to take backlogs of
@@ -265,6 +265,9 @@ Change History
 
 - Fixed: Workers buffered large request bodies in memory.  Now large
   request bodies are buffered to disk.
+
+- Internal optimizations, especially writh regard to handling large
+  request and response bodies.
 
 0.3.0 (2012-03-28)
 ------------------

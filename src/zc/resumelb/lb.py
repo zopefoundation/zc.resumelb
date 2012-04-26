@@ -277,6 +277,8 @@ class Worker(zc.resumelb.util.Worker):
 
     maxrno = (1<<32) - 1
 
+    ReadQueue = zc.resumelb.util.BufferedQueue
+
     def __init__(self, pool, socket, addr):
         self.pool = pool
         self.nrequest = 0

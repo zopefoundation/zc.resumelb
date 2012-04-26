@@ -177,7 +177,7 @@ Now, let's start sending back some data
     >>> write_message(worker2, 1, (response.status, response.headers.items()))
     >>> write_message(worker2, 1, response.body)
     >>> write_message(worker2, 1, '')
-    >>> g3.join()
+    >>> g3.join(1.0)
     >>> g3.value
     <200 OK text/html body='Hello world\n'>
 
@@ -195,11 +195,11 @@ We'll interleave data for the 2 responses on worker1
     >>> write_message(worker1, 1, '')
     >>> write_message(worker1, 2, '')
 
-    >>> g1.join()
+    >>> g1.join(1.0)
     >>> g1.value.status, g1.value.body == '1'*10000
     ('200 OK', True)
 
-    >>> g2.join()
+    >>> g2.join(1.0)
     >>> g2.value.status, g2.value.body == '2'*10000
     ('200 OK', True)
 
@@ -273,7 +273,7 @@ outstanding requests.  We can query this information:
     >>> write_message(worker1, rno, (response.status, response.headers.items()))
     >>> write_message(worker1, rno, response.body)
     >>> write_message(worker1, rno, '')
-    >>> g1.join()
+    >>> g1.join(1.0)
     >>> [ot2] = [w.oldest_time for (_, w) in lb.pool.skilled['h1.com']]
     >>> ot2 > ot
     True
@@ -285,7 +285,7 @@ outstanding requests.  We can query this information:
     >>> write_message(worker1, rno, (response.status, response.headers.items()))
     >>> write_message(worker1, rno, response.body)
     >>> write_message(worker1, rno, '')
-    >>> g2.join()
+    >>> g2.join(1.0)
 
     >>> for worker in sorted(lb.pool.workers):
     ...     print worker, worker.oldest_time
@@ -333,6 +333,7 @@ Now, let's send a partial response from the first GET:
 Now, we'll disconnect worker1:
 
     >>> worker1.close()
+    >>> gevent.sleep(.1)
 
 The second GET and the HEAD request will be send to worker2:
 
@@ -358,7 +359,7 @@ The second GET and the HEAD request will be send to worker2:
     ...     write_message(worker2, rno, '')
 
     >>> for g in greenlets:
-    ...    g.join()
+    ...    g.join(1.0)
     ...    print repr(g.value)
     <200 OK text/html no body>
     <200 OK text/html body='Hello test\n'>
@@ -520,7 +521,7 @@ Now, let's finish the outstanding requests:
     ...      (response.status, response.headers.items()))
     >>> write_message(workers[-1].socket, rno, response.body)
     >>> write_message(workers[-1].socket, rno, '')
-    >>> g.join()
+    >>> g.join(1.0)
 
     >>> rno, env = read_message(workers[0].socket)
     >>> read_message(workers[0].socket)
@@ -530,7 +531,7 @@ Now, let's finish the outstanding requests:
     ...      (response.status, response.headers.items()))
     >>> write_message(workers[0].socket, rno, response.body)
     >>> write_message(workers[0].socket, rno, '')
-    >>> g2.join()
+    >>> g2.join(1.0)
 
     >>> gevent.sleep(.01)
     >>> shutdown_greenlet.ready()
