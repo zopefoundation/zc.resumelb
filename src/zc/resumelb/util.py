@@ -1,8 +1,8 @@
 from struct import pack, unpack
+from marshal import loads, dumps, dump, load
 import errno
 import gevent.queue
 import logging
-import marshal
 import socket
 import tempfile
 
@@ -41,12 +41,12 @@ def read_message(sock):
             raise Disconnected()
         data += recieved
 
-    return rno, marshal.loads(data)
+    return rno, loads(data)
 
 def write_message(sock, rno, *a):
     to_send = []
     for data in a:
-        data = marshal.dumps(data)
+        data = dumps(data)
         to_send.append(pack(">II", rno, len(data)))
         to_send.append(data)
 
@@ -63,10 +63,12 @@ def write_message(sock, rno, *a):
         data = data[sent:]
 
 def writer(writeq, sock, multiplexer):
+    get = writeq.get
+    write_message_ = write_message
     while 1:
-        rno, data = writeq.get()
+        rno, data = get()
         try:
-            write_message(sock, rno, data)
+            write_message_(sock, rno, data)
         except Disconnected:
             multiplexer.disconnected()
             return
@@ -158,7 +160,7 @@ class Buffer:
 
         file = self.file
         file.seek(self.write_position)
-        marshal.dump(data, file)
+        dump(data, file)
         self.write_position = file.tell()
         if data:
             self.size_bytes += len(data)
@@ -170,7 +172,7 @@ class Buffer:
                 queue = self.queue
                 while self.size > 0:
                     file.seek(self.read_position)
-                    data = marshal.load(file)
+                    data = load(file)
                     self.read_position = file.tell()
                     queue.put(data)
                     if self.size > 0:
@@ -180,7 +182,6 @@ class Buffer:
                         self.size -= 1
                     else:
                         assert size == -1
-
 
 
 class Worker:
