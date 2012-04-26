@@ -103,7 +103,7 @@ class BufferedQueue:
 
     def put(self, data):
         try:
-            self._put(data, False, .01)
+            self._put(data, False, .001)
         except gevent.queue.Full:
             self.queue = queue = Buffer(self.queue)
             self._put = queue.put
