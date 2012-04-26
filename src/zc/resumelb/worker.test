@@ -601,9 +601,9 @@ Now, we'll make some requests:
     B 1 2012-02-05 01:02:03.000456 GET /sleep.html?dur=.1
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 22,
-    ...               newenv('', '/sleep.html?dur=.1&size=11'))
+    ...               newenv('', '/sleep.html?dur=.1&size=111'))
     >>> gevent.sleep(.01)
-    B 2 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1&size=11
+    B 2 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1&size=111
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 22, '')
     >>> gevent.sleep(.01)
@@ -615,7 +615,7 @@ Now, we'll make some requests:
     I 1 2012-02-05 01:02:03.030456
     T 2 2012-02-05 01:02:03.030456 test
     - 2 2012-02-05 01:02:03.030456 test2
-    A 2 2012-02-05 01:02:03.030456 200 OK 132
+    A 2 2012-02-05 01:02:03.030456 200 OK 1332
     C 1 2012-02-05 01:02:03.030456
     E 2 2012-02-05 01:02:03.030456
     (22, ('200 OK', [('Content-Length', ...
