@@ -103,7 +103,7 @@ class BufferedQueue:
 
     def put(self, data):
         try:
-            self._put(data, False)
+            self._put(data, False, .01)
         except gevent.queue.Full:
             self.queue = queue = Buffer(self.queue)
             self._put = queue.put
@@ -152,7 +152,7 @@ class Buffer:
             queue.get()
         self.size_bytes = 0
 
-    def put(self, data, block=False):
+    def put(self, data, block=False, timeout=None):
         if self.size < 0:
             return # closed
 
