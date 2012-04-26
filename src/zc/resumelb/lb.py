@@ -77,7 +77,7 @@ class LB:
 
     def handle_wsgi(self, env, start_response):
         rclass = self.classifier(env)
-        logger.debug('wsgi: %s', rclass)
+        #logger.debug('wsgi: %s', rclass)
 
         while 1:
             worker = self.pool.get(rclass)
@@ -313,7 +313,7 @@ class Worker(zc.resumelb.util.Worker):
         return self.__name__
 
     def handle(self, rclass, env, start_response):
-        logger.debug('handled by %s', self.addr)
+        #logger.debug('handled by %s', self.addr)
 
         env = env.copy()
         err = env.pop('wsgi.errors')
@@ -325,24 +325,25 @@ class Worker(zc.resumelb.util.Worker):
         self.requests[rno] = time.time()
         try:
             get = self.start(rno)
+            put = self.put
             try:
-                self.put((rno, env))
+                put((rno, env))
                 content_length = int(env.get('CONTENT_LENGTH', 0))
                 while content_length > 0:
                     data = input.read(min(content_length, block_size))
                     if not data:
                         # Browser disconnected, cancel the request
-                        self.put((rno, None))
+                        put((rno, None))
                         self.end(rno)
                         return
                     content_length -= len(data)
-                    self.put((rno, data))
-                self.put((rno, ''))
+                    put((rno, data))
+                put((rno, ''))
 
                 data = get()
                 if data is None:
                     raise zc.resumelb.util.Disconnected()
-                logger.debug('start_response %r', data)
+                #logger.debug('start_response %r', data)
                 start_response(*data)
             except:
                 # not using finally here, because we only want to end on error
@@ -354,7 +355,7 @@ class Worker(zc.resumelb.util.Worker):
                     while 1:
                         data = get()
                         if data:
-                            logger.debug('yield %r', data)
+                            #logger.debug('yield %r', data)
                             yield data
                         else:
                             if data is None:
