@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.4.0 (2012-04-26)
+0.4.0 (2012-04-27)
 ------------------
 
 - Change the load-balancing algorithm to take backlogs of
