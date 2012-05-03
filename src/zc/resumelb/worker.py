@@ -164,9 +164,8 @@ class Worker:
             while [c for c in self.connections if c.id == connid]:
                 connid += 1
             conn.id = connid
-            logger.info("Received connection (%s) from %s", connid, addr)
             self.connections.add(conn)
-            readers = conn.connected(sock, addr)
+            readers = conn.connected(sock, "%s(%s)" % (addr, connid))
             conn.put((0, self.resume))
             while conn.is_connected:
                 try:

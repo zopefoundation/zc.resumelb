@@ -117,7 +117,9 @@ def test_suite():
         manuel.testing.TestSuite(
             manuel.doctest.Manuel(
                 checker = zope.testing.renormalizing.OutputChecker([
-                    (re.compile(r'127.0.0.1:\d+'), '127.0.0.1:0'),
+                    (re.compile(r'127.0.0.1:\d+'), '127.0.0.1:P'),
+                    (re.compile(r"'127.0.0.1', \d+"), "'127.0.0.1', P'"),
+                    (re.compile(r"<socket fileno=\d+"), "<socket fileno=F"),
                     ])
                 ) + manuel.capture.Manuel(),
             'lb.test', 'pool.test', 'worker.test', 'bytesizedqueue.test',
