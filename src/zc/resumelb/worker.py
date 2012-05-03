@@ -33,6 +33,7 @@ class Worker:
                  history=None, max_skill_age=None,
                  resume_file=None, threads=None, tracelog=None,
                  tracelog_key='tracelog'):
+
         self.app = app
         self.update_settings(dict(history=history, max_skill_age=max_skill_age))
         self.resume_file = resume_file
@@ -58,7 +59,6 @@ class Worker:
         else:
             pool_apply = None
 
-        self.trno = 0
         def call_app(trno, env):
             response = [0]
             env['zc.resumelb.time'] = time.time()
@@ -159,6 +159,12 @@ class Worker:
     def handle_connection(self, sock, addr):
         try:
             conn = zc.resumelb.util.Worker()
+            # compute a short unique id for the connection/lb
+            connid = 0
+            while [c for c in self.connections if c.id == connid]:
+                connid += 1
+            conn.id = connid
+            logger.info("Received connection (%s) from %s", connid, addr)
             self.connections.add(conn)
             readers = conn.connected(sock, addr)
             conn.put((0, self.resume))
@@ -187,8 +193,7 @@ class Worker:
     def handle(self, conn, rno, get, env):
         try:
             if self.tracelog:
-                self.trno += 1
-                trno = self.trno
+                trno = "%s.%s" % (conn.id, rno)
                 query_string = env.get('QUERY_STRING')
                 url = env['PATH_INFO']
                 if query_string:

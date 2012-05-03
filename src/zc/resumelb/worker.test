@@ -598,26 +598,26 @@ Now, we'll make some requests:
 
     >>> write_message(worker_socket, 11, newenv('', '/sleep.html?dur=.1'))
     >>> gevent.sleep(.01)
-    B 1 2012-02-05 01:02:03.000456 GET /sleep.html?dur=.1
+    B 0.11 2012-02-05 01:02:03.000456 GET /sleep.html?dur=.1
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 22,
     ...               newenv('', '/sleep.html?dur=.1&size=111'))
     >>> gevent.sleep(.01)
-    B 2 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1&size=111
+    B 0.22 2012-02-05 01:02:03.010456 GET /sleep.html?dur=.1&size=111
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 22, '')
     >>> gevent.sleep(.01)
-    I 2 2012-02-05 01:02:03.020456
-    C 2 2012-02-05 01:02:03.020456
+    I 0.22 2012-02-05 01:02:03.020456
+    C 0.22 2012-02-05 01:02:03.020456
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 11, '')
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
-    I 1 2012-02-05 01:02:03.030456
-    T 2 2012-02-05 01:02:03.030456 test
-    - 2 2012-02-05 01:02:03.030456 test2
-    A 2 2012-02-05 01:02:03.030456 200 OK 1332
-    C 1 2012-02-05 01:02:03.030456
-    E 2 2012-02-05 01:02:03.030456
+    I 0.11 2012-02-05 01:02:03.030456
+    T 0.22 2012-02-05 01:02:03.030456 test
+    - 0.22 2012-02-05 01:02:03.030456 test2
+    A 0.22 2012-02-05 01:02:03.030456 200 OK 1332
+    C 0.11 2012-02-05 01:02:03.030456
+    E 0.22 2012-02-05 01:02:03.030456
     (22, ('200 OK', [('Content-Length', ...
 
     >>> while 1:
@@ -628,10 +628,10 @@ Now, we'll make some requests:
     ...     if not data: break
 
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
-    T 1 2012-02-05 01:02:03.030456 test
-    - 1 2012-02-05 01:02:03.030456 test2
-    A 1 2012-02-05 01:02:03.030456 200 OK 12
-    E 1 2012-02-05 01:02:03.030456
+    T 0.11 2012-02-05 01:02:03.030456 test
+    - 0.11 2012-02-05 01:02:03.030456 test2
+    A 0.11 2012-02-05 01:02:03.030456 200 OK 12
+    E 0.11 2012-02-05 01:02:03.030456
     (11, ('200 OK', [...('Content-Length', '12')]))
 
 Note that the tracelog request ids are distinct from the request
@@ -645,11 +645,11 @@ this some more.
     >>> _ = read_message(worker_socket2)
     >>> write_message(worker_socket2, 22, newenv('', '/hi.html'), '')
     >>> read_message(worker_socket2) # doctest: +ELLIPSIS
-    B 3 2012-02-05 01:02:03.040456 GET /hi.html
-    I 3 2012-02-05 01:02:03.040456
-    C 3 2012-02-05 01:02:03.040456
-    A 3 2012-02-05 01:02:03.040456 200 OK 79
-    E 3 2012-02-05 01:02:03.040456
+    B 1.22 2012-02-05 01:02:03.040456 GET /hi.html
+    I 1.22 2012-02-05 01:02:03.040456
+    C 1.22 2012-02-05 01:02:03.040456
+    A 1.22 2012-02-05 01:02:03.040456 200 OK 79
+    E 1.22 2012-02-05 01:02:03.040456
     (22, ('200 OK', [('Content-Type', ...
 
 

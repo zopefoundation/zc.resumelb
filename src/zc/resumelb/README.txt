@@ -242,6 +242,14 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.5.0 (2012-05-??)
+------------------
+
+- Changed the way tracelog records are identified to reflect lb
+  request numbers.  Records are disambiguated by including an lb
+  identifier as a prefix.  For example "1.22" indicated request number
+  22 from lb 1.
+
 0.4.0 (2012-04-27)
 ------------------
 
