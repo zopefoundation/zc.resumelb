@@ -682,7 +682,7 @@ Connections and disconnections are logged and reflect the lb ids that
 show up in the trace logs. This allows us to match lb ids and lb
 addresses.
 
-    >>> print util_handler
+    >>> print util_handler # doctest: +ELLIPSIS
     zc.resumelb.util INFO
       worker connected ('127.0.0.1', 51886)(0)
     zc.resumelb.util DEBUG
@@ -694,15 +694,7 @@ addresses.
     zc.resumelb.util INFO
       read_message disconnected <socket fileno=11 sock=127.0.0.1:57540 peer=127.0.0.1:36766>
     zc.resumelb.util INFO
-      worker disconnected ('127.0.0.1', 36766)(1)
-    zc.resumelb.util INFO
-      read_message disconnected <socket fileno=10 sock=127.0.0.1:60590>
-    zc.resumelb.util INFO
-      worker disconnected ('127.0.0.1', 51887)(1)
-    zc.resumelb.util INFO
-      read_message disconnected <socket fileno=12 sock=127.0.0.1:60590 peer=127.0.0.1:51886>
-    zc.resumelb.util INFO
-      worker disconnected ('127.0.0.1', 51886)(0)
+      worker disconnected ('127.0.0.1', 36766)(1)...
 
     >>> util_handler.uninstall()
 
