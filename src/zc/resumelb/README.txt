@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.5.0 (2012-05-??)
+0.5.0 (2012-05-03)
 ------------------
 
 - Changed the way tracelog records are identified to reflect lb
