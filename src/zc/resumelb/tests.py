@@ -132,6 +132,7 @@ def test_suite():
                         r'\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] "(.+) \d+\.\d+'
                         ),
                      'ACCESS'),
+                    (re.compile(r"u'pid': \d+"), "u'pid': PID"),
                     ])
                 ) + manuel.capture.Manuel(),
             'zk.test',

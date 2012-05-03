@@ -250,6 +250,12 @@ Change History
   identifier as a prefix.  For example "1.22" indicated request number
   22 from lb 1.
 
+- When defining workers that register with ZooKeeper, you can now
+  supply a description in the paste.ini file that shows up in
+  ZooKeeper.  While the pid alone provides enough information to find
+  a worker, often a description (e.g. instance name or path) can make
+  it easier.
+
 0.4.0 (2012-04-27)
 ------------------
 

@@ -65,6 +65,7 @@ Let's create a worker, making sure that ZConfig.configureLoggers was called.
     ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
     ...         address='127.0.0.1:0', run=False, loggers='loggers',
     ...         resume_file='resume.mar',
+    ...         description='test',
     ...         )
     ...     configureLoggers.assert_called_with('loggers')
     ...     if basicConfig.called: print 'basicConfig'
@@ -100,6 +101,11 @@ subnode of the given path:
     >>> meta = zk.get('/test/lb/workers/providers/' + waddr)[1]
     >>> bool(meta['ephemeralOwner'])
     True
+
+And provides some meta data:
+
+    >>> pprint(zk.get_properties('/test/lb/workers/providers/' + waddr))
+    {u'description': u'test', u'pid': 4195}
 
 Shutdown
 --------
