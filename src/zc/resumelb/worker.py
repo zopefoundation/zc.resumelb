@@ -20,10 +20,11 @@ logger = logging.getLogger(__name__)
 def error(mess):
     logger.exception(mess)
 
-import traceback
-def error(mess):
-    print >>sys.stderr, mess
-    traceback.print_exc()
+# import traceback, warnings
+# warnings.warn("Debugging error function needs to be removed after debugging.")
+# def error(mess):
+#     print >>sys.stderr, mess
+#     traceback.print_exc()
 
 STRING_BUFFER_SIZE = 9999999
 

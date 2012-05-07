@@ -249,6 +249,9 @@ Change History
   parameters are passed to the constructor and when reading a resume
   file, causing resmes not not to update.
 
+- Fixed: worker errors were written to standard out rather than being
+  logged.
+
 0.5.0 (2012-05-03)
 ------------------
 
