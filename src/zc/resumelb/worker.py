@@ -66,7 +66,15 @@ class Worker:
             def start_response(status, headers, exc_info=None):
                 assert not exc_info # XXX
                 response[0] = (status, headers)
-            body = app(env, start_response)
+
+            try:
+                body = app(env, start_response)
+            except Exception:
+                error("Uncaught application exception for %s" % trno)
+                import webob
+                body = webob.Response(
+                    'A system error occurred', status=500)(env, start_response)
+
             return response[0], body
 
         if tracelog:
@@ -200,7 +208,7 @@ class Worker:
                     url += '?' + query_string
                 self.tracelog(trno, 'B', '%s %s' % (env['REQUEST_METHOD'], url))
             else:
-                trno = 0
+                trno = rno
 
             env['wsgi.errors'] = sys.stderr
 

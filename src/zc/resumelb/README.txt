@@ -252,6 +252,9 @@ Change History
 - Fixed: worker errors were written to standard out rather than being
   logged.
 
+- Fixed: Poorly-behaved WSGI applications that fail to catch errors
+  caused requests to hang rather than return 500 responses.
+
 0.5.0 (2012-05-03)
 ------------------
 

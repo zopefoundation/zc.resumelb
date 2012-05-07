@@ -14,6 +14,7 @@
 import bobo
 import doctest
 import gevent
+import gevent.socket
 import hashlib
 import manuel.capture
 import manuel.doctest
@@ -24,11 +25,13 @@ import os
 import pprint
 import re
 import time
+import traceback
 import unittest
 import webob
 import zc.resumelb.util
 import zc.resumelb.worker
 import zc.zk.testing
+import zope.testing.loggingsupport
 import zope.testing.setupstack
 import zope.testing.wait
 import zope.testing.renormalizing
@@ -86,6 +89,42 @@ def app():
 #
 ###############################################################################
 
+def newenv(rclass, *a, **kw):
+    r = webob.Request.blank(*a, **kw)
+    env = r.environ.copy()
+    inp = env.pop('wsgi.input')
+    del env['wsgi.errors']
+    env['zc.resumelb.request_class'] = rclass
+    return env
+
+def print_response(worker_socket, rno, size_only=False):
+    d = zc.resumelb.util.read_message(worker_socket)
+    try: rn, (status, headers) = d
+    except:
+      print 'wtf', `d`
+      return
+    #rn, (status, headers) = read_message(worker_socket)
+    if rn != rno:
+       raise AssertionError("Bad request numbers", rno, rn)
+    print rno, status
+    for h in sorted(headers):
+        print "%s: %s" % h
+    print
+    size = 0
+    while 1:
+        rn, data = zc.resumelb.util.read_message(worker_socket)
+        if rn != rno:
+           raise AssertionError("Bad request numbers", rno, rn)
+        if data:
+            if size_only:
+                size += len(data)
+            else:
+                print data,
+        else:
+            break
+    if size_only:
+       print size
+
 def test_loading_recipes_with_no_history_argument():
     """A bug as introduced that caused resumes to be loaded
     incorrectly when no history was given to the constructor.  It
@@ -100,6 +139,47 @@ def test_loading_recipes_with_no_history_argument():
 
     >>> pprint.pprint(worker.perf_data)
     {'a': (0, 1.0, 9999), 'b': (0, 0.5, 9999)}
+
+    >>> worker.stop()
+    """
+
+def workers_generate_500s_for_bad_apps():
+    """If an app is poorly behaved and raises exceptions, a worker
+    will generate a 500.
+
+    >>> def baddapp(*args):
+    ...     raise Exception("I'm a bad-app")
+
+    >>> worker = zc.resumelb.worker.Worker(baddapp, ('127.0.0.1', 0))
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> zc.resumelb.util.read_message(worker_socket)
+    (0, {})
+
+    >>> env = newenv('', '/hi.html')
+    >>> handler = zope.testing.loggingsupport.InstalledHandler(
+    ...     'zc.resumelb.worker')
+    >>> zc.resumelb.util.write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 500 Internal Server Error
+    Content-Length: 23
+    Content-Type: text/html; charset=UTF-8
+    <BLANKLINE>
+    A system error occurred
+
+    >>> for record in handler.records:
+    ...     print record.name, record.levelname
+    ...     print record.getMessage()
+    ...     if record.exc_info:
+    ...         traceback.print_exception(*record.exc_info)
+    ... # doctest: +ELLIPSIS
+    zc.resumelb.worker ERROR
+    Uncaught application exception for 1
+    Traceback (most recent call last):
+    ...
+    Exception: I'm a bad-app
+
+    >>> handler.uninstall()
+    >>> worker.stop()
     """
 
 
@@ -121,6 +201,8 @@ def setUp(test):
     zope.testing.setupstack.register(
         test, setattr, zc.resumelb.util, 'queue_size_bytes', old)
     zc.resumelb.util.queue_size_bytes = 999
+    test.globs['newenv'] = newenv
+    test.globs['print_response'] = print_response
 
 def zkSetUp(test):
     setUp(test)
