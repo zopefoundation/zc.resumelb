@@ -18,8 +18,10 @@ import hashlib
 import manuel.capture
 import manuel.doctest
 import manuel.testing
+import marshal
 import mock
 import os
+import pprint
 import re
 import time
 import unittest
@@ -84,6 +86,23 @@ def app():
 #
 ###############################################################################
 
+def test_loading_recipes_with_no_history_argument():
+    """A bug as introduced that caused resumes to be loaded
+    incorrectly when no history was given to the constructor.  It
+    cause invalif perf_data to be initialized.
+
+    >>> with open('resume.mar', 'w') as f:
+    ...     marshal.dump(dict(a=1.0, b=2.0), f)
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0),
+    ...   resume_file='resume.mar')
+
+    >>> pprint.pprint(worker.perf_data)
+    {'a': (0, 1.0, 9999), 'b': (0, 0.5, 9999)}
+    """
+
+
 def test_classifier(env):
     return "yup, it's a test"
 
@@ -137,5 +156,7 @@ def test_suite():
                 ) + manuel.capture.Manuel(),
             'zk.test',
             setUp=zkSetUp, tearDown=zkTearDown),
+        doctest.DocTestSuite(
+            setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
         ))
 

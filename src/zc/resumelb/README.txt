@@ -242,6 +242,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.5.1 (2012-05-07)
+------------------
+
+- Fixed: Worker resume data wasn't initialized correctly when no
+  parameters are passed to the constructor and when reading a resume
+  file, causing resmes not not to update.
+
 0.5.0 (2012-05-03)
 ------------------
 

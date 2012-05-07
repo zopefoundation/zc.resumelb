@@ -49,7 +49,7 @@ class Worker:
             else:
                 for rclass, rpm in self.resume.iteritems():
                     if rpm > 0:
-                        self.perf_data[rclass] = 0, 1.0/rpm, history
+                        self.perf_data[rclass] = 0, 1.0/rpm, self.history
 
         self.connections = set()
 
