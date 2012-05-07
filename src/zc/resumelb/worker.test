@@ -675,6 +675,7 @@ Cleanup:
     >>> logger.removeHandler(handler)
     >>> logger.setLevel(logging.NOTSET)
     >>> worker_socket.close()
+    >>> gevent.sleep(.01)
     >>> worker_socket2.close()
     >>> worker.stop()
 
@@ -684,17 +685,14 @@ addresses.
 
     >>> print util_handler # doctest: +ELLIPSIS
     zc.resumelb.util INFO
-      worker connected ('127.0.0.1', 51886)(0)
-    zc.resumelb.util DEBUG
-      write_message disconnected <socket fileno=8 sock=127.0.0.1:58498>
+      worker connected ('127.0.0.1', 50928)(0)...
     zc.resumelb.util INFO
-      worker disconnected ('127.0.0.1', 34147)(0)
+      worker connected ('127.0.0.1', 50929)(1)...
     zc.resumelb.util INFO
-      worker connected ('127.0.0.1', 51887)(1)
+      worker disconnected ('127.0.0.1', 50928)(0)...
     zc.resumelb.util INFO
-      read_message disconnected <socket fileno=11 sock=127.0.0.1:57540 peer=127.0.0.1:36766>
-    zc.resumelb.util INFO
-      worker disconnected ('127.0.0.1', 36766)(1)...
+      worker disconnected ('127.0.0.1', 50929)(1)...
+
 
     >>> util_handler.uninstall()
 
