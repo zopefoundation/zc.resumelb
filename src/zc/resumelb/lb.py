@@ -3,7 +3,6 @@ import gevent
 import gevent.hub
 import gevent.pywsgi
 import gevent.socket
-import llist
 import logging
 import re
 import sys
@@ -103,7 +102,7 @@ class Pool:
                  unskilled_score=None, variance=None, backlog_history=None):
         self.workers = set()
         self.nworkers = 0
-        self.unskilled = llist.dllist()
+        self.unskilled = []
         self.skilled = {}   # rclass -> {[(score, workers)]}
         self.event = gevent.event.Event()
         _init_backlog(self)
@@ -176,7 +175,7 @@ class Pool:
             workers.add(worker)
             self.nworkers = len(self.workers)
             self._update_decay()
-            worker.lnode = self.unskilled.appendleft(worker)
+            insort(self.unskilled, (0, worker))
             self.event.set()
 
         worker.resume = resume
@@ -192,9 +191,9 @@ class Pool:
         skilled = self.skilled
         for rclass, score in worker.resume.iteritems():
             skilled[rclass].remove((score, worker))
-        if getattr(worker, 'lnode', None) is not None:
-            self.unskilled.remove(worker.lnode)
-            worker.lnode = None
+        del self.unskilled[
+            bisect_left(self.unskilled, (worker.backlog, worker))]
+        worker.lnode = None
         self.workers.remove(worker)
 
         self.backlog -= worker.backlog
@@ -225,7 +224,7 @@ class Pool:
             skilled = self.skilled[rclass] = set()
 
         max_backlog = max(self.variance * self.mbacklog / self.nworkers, 1)
-        min_backlog = unskilled.first.value.mbacklog + 1
+        min_backlog = unskilled[0][0] + 1
         for score, worker in skilled:
             if (worker.mbacklog - min_backlog) > max_backlog:
                 continue
@@ -237,20 +236,22 @@ class Pool:
                 best_worker = worker
 
         if not best_score:
-            best_worker = unskilled.first.value
+            best_worker = unskilled.pop(0)[1]
             if rclass not in best_worker.resume:
                 # We now have an unskilled worker and we need to
                 # assign it a score.
                 score = self.unskilled_score
                 best_worker.resume[rclass] = score
                 skilled.add((score, best_worker))
-
-        # Move worker from lru to mru end of queue
-        unskilled.remove(best_worker.lnode)
-        best_worker.lnode = unskilled.append(best_worker)
+        else:
+            del unskilled[
+                bisect_left(unskilled, (best_worker.backlog, best_worker))
+                ]
 
         best_worker.backlog += 1
         _decay_backlog(best_worker, self.worker_decay)
+
+        insort(unskilled, (best_worker.backlog, best_worker))
 
         self.backlog += 1
         _decay_backlog(self, self.decay)
@@ -262,8 +263,11 @@ class Pool:
         assert self.backlog >= 0, self.backlog
         _decay_backlog(self, self.decay)
         if worker.backlog > 0:
+            unskilled = self.unskilled
+            del unskilled[bisect_left(unskilled, (worker.backlog, worker))]
             worker.backlog -= 1
             _decay_backlog(worker, self.worker_decay)
+            insort(unskilled, (worker.backlog, worker))
 
 def _init_backlog(worker):
     worker.backlog = worker.nbacklog = worker.dbacklog = worker.mbacklog = 0

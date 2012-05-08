@@ -166,7 +166,7 @@ happens when we add some new workers:
       7: [w1, w3]
 
     >>> [pool.get('foo') for i in range(2)]
-    [w5, w5]
+    [w4, w4]
 
 The new workers caused the overall mean to drop and when we got a foo
 request, it went to the newest new worker.  The subsequent request
@@ -182,12 +182,12 @@ When a worker is done doing its work, we put it back in the pool:
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(0.5,1.0)
-      foo: w1(0.5,2.29...), w3(0.5,2.29...), w5(0.5,1.57...)
+      foo: w1(0.5,2.29...), w3(0.5,2.29...), w4(0.5,1.57...)
     Backlogs:
       overall backlog: 3 Decayed: 9.41... Avg: 1.88...
-      0: [w1, w3, w4]
+      0: [w1, w3, w5]
       1: [w2]
-      2: [w5]
+      2: [w4]
 
 Now, when we get a worker, we'll get w1.
 
@@ -205,12 +205,12 @@ data.
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.29...), w1(5.9,1.96...)
+      foo: w4(0.5,1.57...), w2(2.0,1.0), w3(3.8,2.29...), w1(5.9,1.96...)
     Backlogs:
       overall backlog: 4 Decayed: 9.0... Avg: 1.8...
-      0: [w3, w4]
+      0: [w3, w5]
       1: [w1, w2]
-      2: [w5]
+      2: [w4]
 
     >>> pool.get('foo')
     w1
@@ -222,12 +222,12 @@ data.
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.0)
-      foo: w5(0.5,1.5...), w2(2.0,1.0), w3(3.8,1.97...), w1(5.9,1.9...)
+      foo: w4(0.5,1.5...), w2(2.0,1.0), w3(3.8,1.97...), w1(5.9,1.9...)
     Backlogs:
       overall backlog: 7 Decayed: 8.5... Avg: 1.7...
-      0: [w4]
+      0: [w5]
       1: [w2]
-      2: [w1, w3, w5]
+      2: [w1, w3, w4]
 
     >>> pool.get('foo')
     w1
@@ -245,11 +245,11 @@ data.
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.5...)
-      foo: w5(0.5,1.5...), w2(2.0,1.5...), w3(3.8,1.2...), w1(5.9,2.7...)
+      foo: w4(0.5,1.5...), w2(2.0,1.5...), w3(3.8,1.2...), w1(5.9,2.7...)
     Backlogs:
       overall backlog: 4 Decayed: 7.9... Avg: 1.5...
-      0: [w3, w4]
-      2: [w2, w5]
+      0: [w3, w5]
+      2: [w2, w4]
       3: [w1]
 
     >>> [pool.get('foo') for i in range(5)]
@@ -265,11 +265,11 @@ When a worker disconnect, it's removed from the pool:
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.57...)
-      foo: w5(0.5,1.57...), w2(2.0,1.57...)
+      foo: w4(0.5,1.57...), w2(2.0,1.57...)
     Backlogs:
       overall backlog: 1 Decayed: 7.1... Avg: 2.3...
-      0: [w4]
-      2: [w2, w5]
+      0: [w5]
+      2: [w2, w4]
 
 Updating worker settings
 ========================
