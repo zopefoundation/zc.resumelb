@@ -576,12 +576,12 @@ Now, we'll make some requests:
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 22, '')
     >>> gevent.sleep(.01)
-    I 0.22 2012-02-05 01:02:03.020456
+    I 0.22 2012-02-05 01:02:03.020456 0
     C 0.22 2012-02-05 01:02:03.020456
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 11, '')
     >>> read_message(worker_socket) # doctest: +ELLIPSIS
-    I 0.11 2012-02-05 01:02:03.030456
+    I 0.11 2012-02-05 01:02:03.030456 0
     T 0.22 2012-02-05 01:02:03.030456 test
     - 0.22 2012-02-05 01:02:03.030456 test2
     A 0.22 2012-02-05 01:02:03.030456 200 OK 1332
@@ -612,10 +612,11 @@ this some more.
     >>> now += datetime.timedelta(microseconds=10000)
     >>> worker_socket2 = gevent.socket.create_connection(worker.addr)
     >>> _ = read_message(worker_socket2)
-    >>> write_message(worker_socket2, 22, newenv('', '/hi.html'), '')
+    >>> write_message(worker_socket2, 22,
+    ...               newenv('', '/hi.html', method='POST', body='z'*42), '')
     >>> read_message(worker_socket2) # doctest: +ELLIPSIS
-    B 1.22 2012-02-05 01:02:03.040456 GET /hi.html
-    I 1.22 2012-02-05 01:02:03.040456
+    B 1.22 2012-02-05 01:02:03.040456 POST /hi.html
+    I 1.22 2012-02-05 01:02:03.040456 42
     C 1.22 2012-02-05 01:02:03.040456
     A 1.22 2012-02-05 01:02:03.040456 200 OK 79
     E 1.22 2012-02-05 01:02:03.040456

@@ -118,7 +118,6 @@ class Worker:
 
             if threads:
                 def call_app_w_threads(trno, env):
-                    log(trno, 'I', env.get('CONTENT_LENGTH', 0))
                     return pool_apply(call_app_w_tracelog, (trno, env))
                 self.call_app = call_app_w_threads
             else:
@@ -200,13 +199,14 @@ class Worker:
 
     def handle(self, conn, rno, get, env):
         try:
-            if self.tracelog:
+            tracelog = self.tracelog
+            if tracelog:
                 trno = "%s.%s" % (conn.id, rno)
                 query_string = env.get('QUERY_STRING')
                 url = env['PATH_INFO']
                 if query_string:
                     url += '?' + query_string
-                self.tracelog(trno, 'B', '%s %s' % (env['REQUEST_METHOD'], url))
+                tracelog(trno, 'B', '%s %s' % (env['REQUEST_METHOD'], url))
             else:
                 trno = rno
 
@@ -229,6 +229,8 @@ class Worker:
                     break
             f.seek(0)
             env['wsgi.input'] = f
+            if tracelog:
+                tracelog(trno, 'I', env.get('CONTENT_LENGTH') or '0')
 
             response, body = self.call_app(trno, env)
             try:

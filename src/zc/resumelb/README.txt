@@ -242,6 +242,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.5.2 (2012-05-??)
+------------------
+
+- Fixed: Tracelog 'I' records didn't always contain input length information.
+
+- Fixed: Tracelog 'I' records were only included when using thread pools.
+
 0.5.1 (2012-05-07)
 ------------------
 
