@@ -14,6 +14,7 @@
 import bobo
 import doctest
 import gevent
+import gevent.server
 import gevent.socket
 import hashlib
 import manuel.capture
@@ -28,6 +29,8 @@ import time
 import traceback
 import unittest
 import webob
+import webtest
+import zc.resumelb.lb
 import zc.resumelb.util
 import zc.resumelb.worker
 import zc.zk.testing
@@ -125,6 +128,24 @@ def print_response(worker_socket, rno, size_only=False):
     if size_only:
        print size
 
+def spawn(func, *a, **kw):
+    def run_func():
+        try:
+            return func(*a, **kw)
+        except Exception:
+            traceback.print_exc()
+            raise
+    return gevent.spawn(run_func)
+
+class FauxWorker:
+    def __init__(self):
+        self.server = server = gevent.server.StreamServer(
+            ('127.0.0.1', 0), self.handle)
+        server.start()
+        self.addr = '127.0.0.1', server.server_port
+    def handle(self, socket, addr):
+        self.socket = socket
+
 def test_loading_recipes_with_no_history_argument():
     """A bug as introduced that caused resumes to be loaded
     incorrectly when no history was given to the constructor.  It
@@ -180,8 +201,51 @@ def workers_generate_500s_for_bad_apps():
 
     >>> handler.uninstall()
     >>> worker.stop()
-    """
+    """ #"
 
+def Buffering_Temporary_Files_are_closed():
+    """
+    When a worker sends data to an lb faster than it can send it to a
+    browser, the data gets buffered in a temporary file.  When the
+    request is done, the tempirary fileis explicitly closed.
+
+    >>> worker = FauxWorker()
+    >>> lb = zc.resumelb.lb.LB([worker.addr], zc.resumelb.lb.host_classifier)
+    >>> wait(lambda : hasattr(worker, 'socket'))
+    >>> zc.resumelb.util.write_message(worker.socket, 0, {})
+    >>> wait(lambda : lb.pool.workers)
+
+Now make a request that doesn't read data, but waits until we tell it
+to close it's iterator:
+
+    >>> event = gevent.event.Event()
+    >>> @spawn
+    ... def client():
+    ...     def start(*a):
+    ...         print 'start_response', a
+    ...     body = lb.handle_wsgi(
+    ...         webob.Request.blank('/hi.html').environ, start)
+    ...     event.wait()
+    ...     body.close()
+    ...     print 'closed body'
+
+Now, we'll send it enough data to make it ise a temporary file:
+
+    >>> [lbworker] = list(lb.pool.workers)
+    >>> wait(lambda : lbworker.queues)
+
+    >>> zc.resumelb.util.write_message(
+    ...     worker.socket, 1, ('200 OK', []), 'x'*10000, 'x'*10000)
+
+    >>> wait(lambda : hasattr(lbworker.queues[1].queue, 'file'))
+    start_response ('200 OK', [])
+
+    >>> f = lbworker.queues[1].queue.file
+    >>> event.set()
+    >>> wait(lambda : f.closed)
+    closed body
+
+    """
 
 def test_classifier(env):
     return "yup, it's a test"
@@ -203,6 +267,8 @@ def setUp(test):
     zc.resumelb.util.queue_size_bytes = 999
     test.globs['newenv'] = newenv
     test.globs['print_response'] = print_response
+    test.globs['spawn'] = spawn
+    test.globs['Worker'] = FauxWorker
 
 def zkSetUp(test):
     setUp(test)

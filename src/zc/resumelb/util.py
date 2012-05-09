@@ -115,6 +115,9 @@ class BufferedQueue:
     def qsize(self):
         return self.queue.qsize()
 
+    def close(self):
+        pass
+
 class Buffer:
 
     size = size_bytes = read_position = write_position = 0
@@ -181,7 +184,7 @@ class Buffer:
                             self.size_bytes -= len(data)
                         self.size -= 1
                     else:
-                        assert size == -1
+                        assert self.size == -1
 
 
 class Worker:
@@ -206,15 +209,13 @@ class Worker:
     def start(self, rno):
         readq = self.ReadQueue()
         self.readers[rno] = readq.put
-        return readq.get
+        return readq
 
     def end(self, rno):
         try:
             queue = self.readers.pop(rno)
         except KeyError:
             return # previously cancelled
-        if hasattr(queue, 'close'):
-            queue.close()
 
     def put_disconnected(self, *a, **k):
         raise Disconnected()
@@ -226,3 +227,22 @@ class Worker:
             put(None)
 
         self.put = self.put_disconnected
+
+class LBWorker(Worker):
+
+    ReadQueue = BufferedQueue
+
+    def connected(self, socket, addr=None):
+        self.queues = {}
+        return Worker.connected(self, socket, addr)
+
+    def start(self, rno):
+        self.queues[rno] = queue = Worker.start(self, rno)
+        return queue
+
+    def end(self, rno):
+        try:
+            queue = self.readers.pop(rno)
+        except KeyError:
+            return # previously cancelled
+        self.queues.pop(rno).close()

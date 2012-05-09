@@ -189,7 +189,7 @@ class Worker:
                         env = data
                         env['zc.resumelb.lb_addr'] = addr
                         gevent.spawn(
-                            self.handle, conn, rno, conn.start(rno), env)
+                            self.handle, conn, rno, conn.start(rno).get, env)
                 else:
                     rput(data)
                     if data is None:

@@ -10,17 +10,6 @@ set of worker addresses at any time.
 
 To test lb behavior, we'll create faux workers the lb can connect to.
 
-    >>> import gevent.server
-    >>> class Worker:
-    ...     def __init__(self):
-    ...         self.server = server = gevent.server.StreamServer(
-    ...             ('127.0.0.1', 0), self.handle)
-    ...         server.start()
-    ...         self.addr = '127.0.0.1', server.server_port
-    ...     def handle(self, socket, addr):
-    ...         self.socket = socket
-
-
     >>> workers = [Worker() for i in range(2)]
 
 We have some workers running. Now, let's create a load balancer:
@@ -50,6 +39,8 @@ When the workers get connections, they send the lb their resumes:
 
     >>> write_message(worker1, 0, {'h1.com': 10.0})
     >>> write_message(worker2, 0, {'h2.com': 10.0})
+
+    >>> import gevent
     >>> gevent.sleep(.01) # Give resumes time to arrive
 
 Now, let's make a request and make sure the data gets where it's
@@ -57,7 +48,7 @@ supposed to go.
 
     >>> import webtest
     >>> app1 = webtest.TestApp(lb.handle_wsgi)
-    >>> g1 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
+    >>> g1 = spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
 
     >>> rno, env1 = read_message(worker1)
 
@@ -92,7 +83,7 @@ If we send another request for the same host, it will appear on the same
 socket.  This time, we'll make a request that provides a large body:
 
     >>> app2 = webtest.TestApp(lb.handle_wsgi)
-    >>> g2 = gevent.spawn(
+    >>> g2 = spawn(
     ...     app2.put, '/hi.html', 'i'*200000, [('Host', 'h1.com')])
 
     >>> rno, env2 = read_message(worker1)
@@ -143,7 +134,7 @@ socket.  This time, we'll make a request that provides a large body:
 If we make a request to h2.com, we'll get the request on worker2:
 
     >>> app3 = webtest.TestApp(lb.handle_wsgi)
-    >>> g3 = gevent.spawn(app3.get, '/hi.html', {}, [('Host', 'h2.com')])
+    >>> g3 = spawn(app3.get, '/hi.html', {}, [('Host', 'h2.com')])
 
     >>> rno, env3 = read_message(worker2)
     >>> rno
@@ -252,7 +243,7 @@ outstanding requests.  We can query this information:
     >>> import time
     >>> t1 = time.time()
     >>> app1 = webtest.TestApp(lb.handle_wsgi)
-    >>> g1 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
+    >>> g1 = spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
     >>> rno = read_message(worker1)[0]
     >>> read_message(worker1) == (rno, '')
     True
@@ -264,7 +255,7 @@ outstanding requests.  We can query this information:
 
     >>> gevent.sleep(.01)
     >>> app2 = webtest.TestApp(lb.handle_wsgi)
-    >>> g2 = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
+    >>> g2 = spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
     >>> gevent.sleep(.01)
     >>> [ot] == [w.oldest_time for (_, w) in lb.pool.skilled['h1.com']]
     True
@@ -308,7 +299,7 @@ disconnects, that response is simply truncated.
     ...                'OPTIONS', 'TRACE'):
     ...     app = webtest.TestApp(lb.handle_wsgi)
     ...     greenlets.append(
-    ...         gevent.spawn(app.request, '/hi.html', method=method,
+    ...         spawn(app.request, '/hi.html', method=method,
     ...                      headers=[('Host', 'h1.com')], status='*'))
     ...     rno, data = read_message(worker1)
     ...     rno2, blank = read_message(worker1)
@@ -457,7 +448,7 @@ Let's add a worker and wait for it to be connected:
 
 If we submit an h4.com request, it will go to the new worker:
 
-    >>> g = gevent.spawn(app1.get, '/hi.html', {}, [('Host', 'h4.com')])
+    >>> g = spawn(app1.get, '/hi.html', {}, [('Host', 'h4.com')])
     >>> rno, env = read_message(workers[-1].socket)
     >>> read_message(workers[-1].socket)
     (1, '')
@@ -501,7 +492,7 @@ Load balancers have a shutdown method that:
 We already have a request in flight.  Let's add another on a different
 worker:
 
-    >>> g2 = gevent.spawn(app2.get, '/hi.html', {}, [('Host', 'h2.com')])
+    >>> g2 = spawn(app2.get, '/hi.html', {}, [('Host', 'h2.com')])
 
     >>> gevent.sleep(.01)
     >>> [w.backlog for w in lb.pool.workers]
@@ -510,7 +501,7 @@ worker:
 If we call shutdown, it will block until we have no in-flight
 connections, so we'll call it in a greenlet:
 
-    >>> shutdown_greenlet = gevent.spawn(lb.shutdown)
+    >>> shutdown_greenlet = spawn(lb.shutdown)
     >>> gevent.sleep(.01)
     >>> shutdown_greenlet.ready()
     False

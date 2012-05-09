@@ -29,9 +29,9 @@ BufferedQueue only implements the ``put``, ``get``, and qsize queue methods.
     >>> q.qsize()
     0
 
-If it hasn't started bufferng yet, it doesn't have a close method:
+If it hasn't started bufferng yet, it's queue is not a Buffer
 
-    >>> hasattr(q, 'close')
+    >>> isinstance(q.queue, zc.resumelb.util.Buffer)
     False
 
 In testing, the underlying queue max size is only 999 bytes.
@@ -41,11 +41,11 @@ the fact that the underlying ByteSizedQueue doesn't block until the
 bytes in the queue are over the limit:
 
     >>> q.put('a'*1000)
-    >>> hasattr(q, 'close')
+    >>> isinstance(q.queue, zc.resumelb.util.Buffer)
     False
 
     >>> q.put('b'*1000)
-    >>> hasattr(q, 'close')
+    >>> isinstance(q.queue, zc.resumelb.util.Buffer)
     True
 
 Now, we've triggered the buffering. We can keep adding data:

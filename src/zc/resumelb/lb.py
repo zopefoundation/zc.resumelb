@@ -272,12 +272,9 @@ def _decay_backlog(worker, decay):
     worker.dbacklog = worker.dbacklog*decay + worker.backlog
     worker.nbacklog = worker.nbacklog*decay + 1
     worker.mbacklog = worker.dbacklog / worker.nbacklog
-
-class Worker(zc.resumelb.util.Worker):
+class Worker(zc.resumelb.util.LBWorker):
 
     maxrno = (1<<32) - 1
-
-    ReadQueue = zc.resumelb.util.BufferedQueue
 
     def __init__(self, pool, socket, addr):
         self.pool = pool
@@ -324,7 +321,7 @@ class Worker(zc.resumelb.util.Worker):
         self.nrequest = rno % self.maxrno
         self.requests[rno] = time.time()
         try:
-            get = self.start(rno)
+            get = self.start(rno).get
             put = self.put
             try:
                 put((rno, env))
@@ -352,10 +349,12 @@ class Worker(zc.resumelb.util.Worker):
 
             def content():
                 try:
+                    # We yield a first value to get into the try so
+                    # the generator close will execute thf finally block. :(
+                    yield 1
                     while 1:
                         data = get()
                         if data:
-                            #logger.debug('yield %r', data)
                             yield data
                         else:
                             if data is None:
@@ -365,7 +364,10 @@ class Worker(zc.resumelb.util.Worker):
                 finally:
                     self.end(rno)
 
-            return content()
+            # See the "yield 1" comment above. :(
+            content = content()
+            content.next()
+            return content
         finally:
             del self.requests[rno]
 

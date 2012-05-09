@@ -242,8 +242,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.5.2 (2012-05-??)
+0.5.2 (2012-05-09)
 ------------------
+
+- Fixed: Temporary files created when buffering data in the load
+  balancers weren't closed explicitly.  Generally, they were closed
+  through garbage collection, but in certain situations, their numbers
+  could build quickly, leading to file-descriptor exhaustion.
 
 - Fixed: Tracelog 'I' records didn't always contain input length information.
 
