@@ -275,7 +275,17 @@ LB status server
 ----------------
 
 When we started the lb, we told it to create a status server.  The
-server is registered with ZooKeeper:
+server is registered with ZooKeeper. We'll cause a request to be
+outstanding to have a case with a worker backlog:
+
+    >>> sock = gevent.socket.create_connection(('127.0.0.1', addr[1]))
+    >>> sock.sendall('''GET /gsleep.html?dur=1 HTTP/1.0\r
+    ... Host: h1.com\r
+    ... Content-Length: 0\r
+    ... \r
+    ... ''')
+    >>> gevent.sleep(.1)
+
 
     >>> import socket
     >>> status_socket = gevent.socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -284,22 +294,31 @@ server is registered with ZooKeeper:
     >>> import json
     >>> status = json.loads(status_file.read())
     >>> pprint(status, width=1) # doctest: +ELLIPSIS
-    {u'backlog': 0,
-     u'mean_backlog': 0.4...,
-     u'workers': [[u'127.0.0.1:...',
-                   0,
-                   ...],
-                  [u'127.0.0.1:...',
-                   0,
-                   ...]]}
+    {u'backlog': 1,
+     u'mean_backlog': 0.6...,
+     u'workers': [...]}
 
     >>> sorted(status['workers'], key=lambda w: w[2])
     ... # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [[u'127.0.0.1:...', 0, 0, None],
-     [u'127.0.0.1:...', 0, 0.48..., None]]
+     [u'127.0.0.1:...', 1, 0.6..., 13...]]
 
     >>> status_file.close()
     >>> status_socket.close()
+
+There's also a command-line client for the status server:
+
+    >>> zc.resumelb.zk.get_lb_status(['status.sock'])
+    status for status.sock
+      backlog: 1, mean backlog: 0.7
+      workers: 2, mean backlog per worker: 0.3
+    <BLANKLINE>
+                            worker backlog mean bl     age
+                   127.0.0.1:52308       0     0.0       -
+                   127.0.0.1:48407       1     0.7       0
+
+
+    >>> sock.close()
 
 Shutdown
 --------

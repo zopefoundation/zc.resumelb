@@ -24,6 +24,7 @@ import re
 import signal
 import socket
 import sys
+import time
 import zc.parse_addr
 import zc.zk
 
@@ -227,7 +228,8 @@ def lbmain(args=None, run=True):
                         (worker.__name__,
                          worker.backlog,
                          worker.mbacklog,
-                         worker.oldest_time
+                         (int(worker.oldest_time)
+                          if worker.oldest_time else None),
                          )
                         for worker in sorted(
                             pool.workers, key=lambda w: w.__name__)
@@ -271,3 +273,33 @@ class AccessLog:
 
     def __init__(self, logger):
         self.write = logging.getLogger(logger).info
+
+worker_format = '%30s%8s%8s%8s'
+def get_lb_status(args=None):
+    if args is None:
+        args = sys.argv[1:]
+
+    for addr in args:
+        print 'status for', addr
+        status_socket = gevent.socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        status_socket.connect(addr)
+        status_file = status_socket.makefile()
+        status = json.loads(status_file.read())
+        status_file.close()
+        status_socket.close()
+        now = int(time.time())
+        workers = status['workers']
+        if workers:
+            print '  backlog: %s, mean backlog: %.1f' % (
+                status['backlog'], status['mean_backlog'])
+            print '  workers: %s, mean backlog per worker: %.1f' % (
+                len(workers), status['mean_backlog'] / len(workers),
+                )
+            print
+            print worker_format % ('worker', 'backlog', 'mean bl', 'age')
+            for name, bl, mbl, start in workers:
+                print worker_format % (
+                    name, bl, "%.1f" % mbl,
+                    now-start if start is not None else '-')
+        else:
+            print 'This load-balancer has no workers!'

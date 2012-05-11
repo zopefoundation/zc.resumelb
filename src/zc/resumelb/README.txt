@@ -242,6 +242,14 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.6.0 (2012-05-11)
+------------------
+
+- Added a command-line script to fetch lb status data, assuming you're
+  using the ZooKeeper-aware load-balancer script and have requested a
+  status server.  (Also updated the status output to show request
+  start times as integer seconds.)
+
 0.5.2 (2012-05-09)
 ------------------
 
