@@ -186,7 +186,7 @@ class Pool:
             except KeyError:
                 skilled[rclass] = set(((score, worker), ))
 
-        logger.info('new resume\n%s', self)
+        logger.info('new resume: %s', worker)
 
     def remove(self, worker):
         skilled = self.skilled
@@ -272,6 +272,7 @@ def _decay_backlog(worker, decay):
     worker.dbacklog = worker.dbacklog*decay + worker.backlog
     worker.nbacklog = worker.nbacklog*decay + 1
     worker.mbacklog = worker.dbacklog / worker.nbacklog
+
 class Worker(zc.resumelb.util.LBWorker):
 
     maxrno = (1<<32) - 1
