@@ -15,6 +15,7 @@
 """
 import gevent
 import gevent.pool
+import gevent.pywsgi
 import gevent.server
 import gevent.socket
 import json
