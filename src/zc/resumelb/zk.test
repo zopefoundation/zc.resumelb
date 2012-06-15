@@ -202,6 +202,8 @@ string, the string is split and testing mode (run=False) is assumed.
                             Run a status server for getting pool
                             information. The argument is a unix-domain
                             socket path to listen on.
+      -t SOCKET_TIMEOUT, --socket-timeout=SOCKET_TIMEOUT
+                            HTTP socket timeout.
       -L LOGGER_CONFIGURATION, --logger-configuration=LOGGER_CONFIGURATION
                             Read logger configuration from the given
                             configuration file path.  The configuration
@@ -359,11 +361,17 @@ the options!
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
     ...     lb, server = zc.resumelb.zk.lbmain(
     ...         'zookeeper.example.com:2181 /test/lb'
-    ...         ' -alocalhost:0 -laccess -b1 -m1'
+    ...         ' -alocalhost:0 -laccess -b1 -m2'
     ...         ' --logger-configuration log.conf '
     ...         ' -rzc.resumelb.tests:test_classifier -eoops.html'
     ...         )
     ...     configureLoggers.assert_called_with('loggers')
+
+    >>> server.backlog
+    1
+
+    >>> server.pool.size
+    2
 
     >>> lb.disconnect_message
     'oops'
@@ -377,12 +385,6 @@ the options!
     >>> len(lb.pool.workers)
     2
 
-    >>> sock = gevent.socket.create_connection(addr)
-    >>> sock2 = gevent.socket.create_connection(addr)
-    >>> sock3 = gevent.socket.create_connection(addr, .00001)
-    Traceback (most recent call last):
-    ...
-    timeout: timed out
 
 The 3rd collection failed because we said to only accept one
 connection at a time and set the backlog to 1.
@@ -395,6 +397,7 @@ handler, so we can verify that accesses were logged there.
 
 Let's do a request.
 
+    >>> sock = gevent.socket.create_connection(addr)
     >>> sock.sendall('''GET /hi.html HTTP/1.0\r
     ... Host: h1.com\r
     ... Content-Length: 0\r
@@ -404,7 +407,6 @@ Let's do a request.
     HTTP/1.0 200 OK...
 
     >>> sock.close()
-    >>> sock2.close()
 
 We now have access-log records in the access-log handler:
 

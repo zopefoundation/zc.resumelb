@@ -85,6 +85,16 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
         gevent.sleep(.01)
         return worker
 
+class WSGIServer(gevent.pywsgi.WSGIServer):
+
+    def __init__(self, *args, **kw):
+        self.__socket_timeout = kw.pop('socket_timeout')
+        gevent.pywsgi.WSGIServer.__init__(self, *args, **kw)
+
+    def handle(self, socket, address):
+        socket.settimeout(self.__socket_timeout)
+        return gevent.pywsgi.WSGIServer.handle(self, socket, address)
+
 def lbmain(args=None, run=True):
     """%prog [options] zookeeper_connection path
 
@@ -115,6 +125,9 @@ def lbmain(args=None, run=True):
         '-s', '--status-server',
         help=("Run a status server for getting pool information. "
               "The argument is a unix-domain socket path to listen on."))
+    parser.add_option(
+        '-t', '--socket-timeout', type='float', default=99.,
+        help=('HTTP socket timeout.'))
     parser.add_option(
         '-L', '--logger-configuration',
         help=
@@ -203,9 +216,9 @@ def lbmain(args=None, run=True):
     else:
         accesslog = None
 
-    server = gevent.pywsgi.WSGIServer(
-        addr, lb.handle_wsgi, backlog = options.backlog,
-        spawn = spawn, log = accesslog)
+    server = WSGIServer(
+        addr, lb.handle_wsgi, backlog=options.backlog,
+        spawn=spawn, log=accesslog, socket_timeout=options.socket_timeout)
     server.start()
 
     registration_data = {}

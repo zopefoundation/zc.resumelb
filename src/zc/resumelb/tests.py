@@ -247,6 +247,56 @@ Now, we'll send it enough data to make it ise a temporary file:
 
     """
 
+def zk_wsgi_server_output_timeout():
+    r"""
+
+    >>> import zc.resumelb.zk, zc.resumelb.tests, zc.zk
+    >>> zk = zc.zk.ZooKeeper('zookeeper.example.com:2181')
+    >>> zk.import_tree('''
+    ... /test
+    ...   /lb
+    ...     /providers
+    ...     /workers
+    ...       /providers
+    ... ''')
+
+    >>> app = zc.resumelb.tests.app()
+    >>> worker = zc.resumelb.zk.worker(
+    ...     app, None, address='127.0.0.1:0', run=False,
+    ...     zookeeper='zookeeper.example.com:2181', path='/test/lb/workers')
+
+    >>> lb, server = zc.resumelb.zk.lbmain(
+    ...     'zookeeper.example.com:2181 /test/lb -t.2')
+
+    >>> [addr] = map(zc.parse_addr.parse_addr,
+    ...              zk.get_children('/test/lb/providers'))
+
+    Now we'll make a request, but not consume output.  It should
+    timeout after .2 seconds:
+
+    >>> with mock.patch('sys.stderr'):
+    ...     with mock.patch('sys.stdout'):
+    ...         sock = gevent.socket.create_connection(addr)
+    ...         sock.sendall('GET /gen.html?size=999 HTTP/1.0\r\n\r\n')
+    ...         gevent.sleep(1)
+
+    The various output that get's generated in the timeout case is
+    sub-optimal and, hopefully, likely to change, so we won't show it
+    here.  The only clue we have that the timeout worked is that the
+    output is less than we expect:
+
+    >>> f = sock.makefile()
+    >>> data = f.read()
+    >>> len(data) < 999*12000
+    True
+
+    >>> worker.stop()
+    >>> server.stop()
+    >>> lb.stop()
+    >>> zk.close()
+
+    """
+
 def test_classifier(env):
     return "yup, it's a test"
 
@@ -315,6 +365,6 @@ def test_suite():
             'zk.test',
             setUp=zkSetUp, tearDown=zkTearDown),
         doctest.DocTestSuite(
-            setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
+            setUp=zkSetUp, tearDown=zope.testing.setupstack.tearDown),
         ))
 

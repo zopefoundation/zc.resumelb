@@ -242,6 +242,11 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.6.2 (2012-06-15)
+------------------
+
+- Fixed: a lack of socket timeout could cause requests to leak.
+
 0.6.0 (2012-05-11)
 ------------------
 
