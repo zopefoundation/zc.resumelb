@@ -38,23 +38,27 @@ class LB:
         self.set_worker_addrs(worker_addrs)
 
     def set_worker_addrs(self, addrs):
-        addrs = set(addrs)
+        # addrs can be an iterable of addresses, or a dict {addr -> version}
+        if not isinstance(addrs, dict):
+            addrs = dict((addr, None) for addr in addrs)
+
         workletts = self.workletts
         old = list(workletts)
         for addr in addrs:
             if addr not in workletts:
-                workletts[addr] = gevent.spawn(self.connect, addr, workletts)
+                workletts[addr] = gevent.spawn(
+                    self.connect, addr, workletts, addrs[addr])
 
         for addr in old:
             if addr not in addrs:
                 workletts.pop(addr)
 
     connect_sleep = 1.0
-    def connect(self, addr, workletts):
+    def connect(self, addr, workletts, version):
         while addr in workletts:
             try:
                 socket = gevent.socket.create_connection(addr)
-                Worker(self.pool, socket, addr)
+                Worker(self.pool, socket, addr, version)
             except gevent.GreenletExit, v:
                 try:
                     socket.close()
@@ -277,11 +281,12 @@ class Worker(zc.resumelb.util.LBWorker):
 
     maxrno = (1<<32) - 1
 
-    def __init__(self, pool, socket, addr):
+    def __init__(self, pool, socket, addr, version):
         self.pool = pool
         self.nrequest = 0
         self.requests = {}
         self.__name__ = '%s:%s' % addr
+        self.version = version
 
         readers = self.connected(socket, addr)
 

@@ -480,6 +480,24 @@ before that we closed:
 Typically, by the time we remove an address, the worker will already
 have gone away.
 
+By default, workers don't have versions:
+
+    >>> [w.version for w in lb.pool.workers]
+    [None, None]
+
+When adding workers, however, we can supply a dictionary, mapping
+addresses to versions, rather than a list.
+
+    >>> workers.append(Worker())
+    >>> lb.set_worker_addrs(dict((w.addr, 1) for w in workers))
+    >>> wait(lambda : hasattr(workers[-1], 'socket'))
+    >>> write_message(workers[-1].socket, 0, {'h4.com': 10})
+    >>> gevent.sleep(.01)
+    >>> sorted(str(w.version) for w in lb.pool.workers)
+    ['1', 'None', 'None']
+
+(only new workers are affected.)
+
 Graceful shutdown
 =================
 
