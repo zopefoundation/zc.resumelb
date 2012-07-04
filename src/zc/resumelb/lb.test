@@ -498,6 +498,9 @@ addresses to versions, rather than a list.
 
 (only new workers are affected.)
 
+    >>> workers.pop(-1).socket.close()
+    >>> lb.set_worker_addrs([w.addr for w in workers])
+
 Graceful shutdown
 =================
 
