@@ -30,7 +30,8 @@ import zc.parse_addr
 import zc.zk
 
 def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
-           threads=None, backdoor=False, description=None, run=True, **kw):
+           threads=None, backdoor=False, description=None, version=None,
+           run=True, **kw):
     """Paste deploy server runner
     """
     if loggers:
@@ -65,6 +66,9 @@ def worker(app, global_conf, zookeeper, path, loggers=None, address=':0',
 
     if description:
         registration_data['description'] = description
+
+    if version:
+        registration_data['version'] = version
 
     zk.register_server(path+'/providers', worker.addr, **registration_data)
     worker.zk = zk

@@ -52,6 +52,12 @@ address
 loggers
   A ZConfig loggers-definition string, or a log-level
 
+description
+  An informatove description of the worker.
+
+version
+  The software version the worker is running.
+
 Let's create a worker, making sure that ZConfig.configureLoggers was called.
 
     >>> app = zc.resumelb.tests.app()
@@ -66,6 +72,7 @@ Let's create a worker, making sure that ZConfig.configureLoggers was called.
     ...         address='127.0.0.1:0', run=False, loggers='loggers',
     ...         resume_file='resume.mar',
     ...         description='test',
+    ...         version='42',
     ...         )
     ...     configureLoggers.assert_called_with('loggers')
     ...     if basicConfig.called: print 'basicConfig'
@@ -105,7 +112,7 @@ subnode of the given path:
 And provides some meta data:
 
     >>> pprint(zk.get_properties('/test/lb/workers/providers/' + waddr))
-    {u'description': u'test', u'pid': 4195}
+    {u'description': u'test', u'pid': 4195, u'version': u'42'}
 
 Shutdown
 --------
