@@ -1,4 +1,5 @@
 from bisect import bisect_left, insort
+import collections
 import gevent
 import gevent.hub
 import gevent.pywsgi
@@ -104,13 +105,19 @@ class LB:
 class Pool:
 
     def __init__(self,
-                 unskilled_score=None, variance=None, backlog_history=None):
+                 unskilled_score=None, variance=None, backlog_history=None,
+                 single_version=False):
         self.workers = set()
         self.nworkers = 0
         self.unskilled = llist.dllist()
         self.skilled = {}   # rclass -> {[(score, workers)]}
         self.event = gevent.event.Event()
         _init_backlog(self)
+        self.single_version = single_version
+        if single_version:
+            # {version -> {worker}}
+            self.byversion = collections.defaultdict(set)
+            self.version = None
 
         self.update_settings(dict(
             unskilled_score=unskilled_score,
@@ -146,6 +153,12 @@ class Pool:
     def __repr__(self):
         outl = []
         out = outl.append
+        if self.single_version:
+            out('Version: %s' % self.version)
+            for v in self.byversion:
+                if v != self.version and self.byversion[v]:
+                    out('  Inactive: %s: %r' % (v, self.byversion[v]))
+
         out('Request classes:')
         for (rclass, skilled) in sorted(self.skilled.items()):
             out('  %s: %s'
@@ -168,7 +181,7 @@ class Pool:
             out('  %s: %r' % (backlog, sorted(workers)))
         return '\n'.join(outl)
 
-    def new_resume(self, worker, resume):
+    def _new_resume(self, worker, resume):
         skilled = self.skilled
         workers = self.workers
 
@@ -192,7 +205,26 @@ class Pool:
 
         logger.info('new resume: %s', worker)
 
-    def remove(self, worker):
+    def new_resume(self, worker, resume):
+        if self.single_version:
+            version = worker.version
+            self.byversion[version].add(worker)
+            if self.version is None:
+                self.version = version
+            if version == self.version:
+                # Adding a worker to the quorum will always preserve the quorum
+                self._new_resume(worker, resume)
+            else:
+                # Since the worker wasn't in the quorum, we don't call
+                # _new_resume, so we need to update it's resume ourselves:
+                worker.resume = resume
+
+                # Adding this worker might have created a new quorum
+                self._update_quorum()
+        else:
+            self._new_resume(worker, resume)
+
+    def _remove(self, worker):
         skilled = self.skilled
         for rclass, score in worker.resume.iteritems():
             skilled[rclass].remove((score, worker))
@@ -201,16 +233,42 @@ class Pool:
             worker.lnode = None
         self.workers.remove(worker)
 
-        self.backlog -= worker.backlog
-        assert self.backlog >= 0, self.backlog
-        _decay_backlog(self, self.decay)
-
         self.nworkers = len(self.workers)
         if self.nworkers:
             self._update_decay()
         else:
-            assert self.backlog == 0, self.backlog
             self.event.clear()
+
+    def remove(self, worker):
+
+        self.backlog -= worker.backlog
+        assert self.backlog >= 0, self.backlog
+        _decay_backlog(self, self.decay)
+
+        if self.single_version:
+            self.byversion[worker.version].remove(worker)
+            if worker.version == self.version:
+                self._remove(worker)
+                self._update_quorum()
+            # Note if the worker's version isn't self.version, it's
+            # not in the quorum, and it's removal can't cause the
+            # quorum to change.
+        else:
+            self._remove(worker)
+
+    def _update_quorum(self):
+        byversion = self.byversion
+        version = sorted(byversion, key=lambda v: -len(byversion[v]))[0]
+        if (version == self.version or
+            len(byversion[version]) == len(byversion[self.version])
+            ):
+            return # No change
+
+        for worker in byversion[self.version]:
+            self._remove(worker)
+        self.version = version
+        for worker in byversion[version]:
+            self._new_resume(worker, worker.resume)
 
     def get(self, rclass, timeout=None):
         """Get a worker to handle a request class

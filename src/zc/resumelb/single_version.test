@@ -1,0 +1,135 @@
+===================
+Single-version pool
+===================
+
+When updating workers, it may be necessary to only run one version of
+worker software at a time.  The resumelb pool has some support for
+this.  If the ``single_version`` option is used, then it will group
+workers by version and only send work to workers in the largest group.
+
+Let's look at an example.
+
+    >>> import zc.resumelb.lb
+    >>> pool = zc.resumelb.lb.Pool(single_version=True)
+
+
+    >>> class Worker:
+    ...     def __init__(self, name, version):
+    ...         self.name = name
+    ...         self.version = version
+    ...     def __repr__(self):
+    ...         return self.name
+    ...     def __cmp__(self, other):
+    ...         return cmp(self.name, other.name)
+    ...     def __hash__(self):
+    ...         return hash(self.name)
+    ...     def handle(self, *args):
+    ...         pass
+
+    >>> w1 = Worker('w1', 1)
+    >>> pool.new_resume(w1, {})
+    >>> w2 = Worker('w2', 1)
+    >>> pool.new_resume(w2, {})
+
+So, we have 2 unskilled workers. Now we'll add a skilled worker, but
+with version 2:
+
+    >>> w3 = Worker('w3', 2)
+    >>> pool.new_resume(w3, {'a': .1})
+    >>> pool.get('a', 0.0)
+    w2
+
+If we ask for a worker for 'a', we'll get one of the unskilled
+workers, even though we have a skilled worker, because the skilled
+worker had the wrong version:
+
+    >>> w4 = Worker('w4', 2)
+    >>> pool.new_resume(w4, {'b': .1})
+    >>> pool.get('b', 0.0)
+    w1
+
+If we look at the pool, we won't see the new workers we added, because
+they aren't active:
+
+    >>> print pool # doctest: +ELLIPSIS
+    Version: 1
+      Inactive: 2: set([w4, w3])
+    Request classes:
+      a: w2(1.0,1.0)
+      b: w1(1.0,1.0)
+    Backlogs:
+      overall backlog: 2 Decayed: 1.50... Avg: 0.75...
+      1: [w1, w2]
+
+Now, if we add another worker with version 2, we'll stop using the
+version 1 workers even though they have a higher score:
+
+    >>> w5 = Worker('w5', 2)
+    >>> pool.new_resume(w5, {'c': .1})
+    >>> pool.get('c', 0.0)
+    w5
+    >>> pool.get('a', 0.0)
+    w3
+
+    >>> print pool # doctest: +ELLIPSIS
+    Version: 2
+      Inactive: 1: set([w2, w1])
+    Request classes:
+      a: w3(0.1,1.0)
+      b: w4(0.1,0)
+      c: w5(0.1,1.0)
+    Backlogs:
+      overall backlog: 4 Decayed: 2.52686361662 Avg: 0.842287872206
+      0: [w4]
+      1: [w3, w5]
+
+Let's finish the outstanding requests to w1:
+
+    >>> pool.put(w1)
+    >>> print pool # doctest: +ELLIPSIS
+    Version: 2
+      Inactive: 1: set([w2, w1])
+    Request classes:
+      a: w3(0.1,1.0)
+      b: w4(0.1,0)
+      c: w5(0.1,1.0)
+    Backlogs:
+      overall backlog: 3 Decayed: 2.62523984999 Avg: 0.875079949996
+      0: [w4]
+      1: [w3, w5]
+
+Now, disconnect w4 and w5, the quorum will switch to version 1:
+
+    >>> pool.remove(w4)
+    >>> pool.remove(w5)
+    >>> print pool # doctest: +ELLIPSIS
+    Version: 1
+      Inactive: 2: set([w3])
+    Request classes:
+      a: w2(1.0,0)
+      b: w1(1.0,0)
+      c: 
+    Backlogs:
+      overall backlog: 2 Decayed: 2.58547913529 Avg: 1.29273956765
+      0: [w1, w2]
+
+If we make a request, it'll be handled by the bew quorum:
+
+    >>> pool.get('b', 0.0)
+    w1
+
+If we remove the last version 2:
+
+    >>> pool.remove(w3)
+    >>> print pool # doctest: +ELLIPSIS
+    Version: 1
+    Request classes:
+      a: w2(1.0,0)
+      b: w1(1.0,1.0)
+      c: 
+    Backlogs:
+      overall backlog: 2 Decayed: 2.56315626836 Avg: 1.28157813418
+      0: [w2]
+      1: [w1]
+
+We don't print inactive, since there aren't any.
