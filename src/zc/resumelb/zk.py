@@ -116,7 +116,6 @@ def lbmain(args=None, run=True):
         '-a', '--address', default=':0',
         help="Address to listed on for web requests"
         )
-    parser.add_option('-l', '--access-logger', help='Access-log logger name.')
     parser.add_option(
         '-b', '--backlog', type='int',
         help="Server backlog setting.")
@@ -124,15 +123,10 @@ def lbmain(args=None, run=True):
         '-d', '--backdoor', action='store_true',
         help="Run a backdoor server. Use with caution!")
     parser.add_option(
-        '-m', '--max-connections', type='int',
-        help="Maximum number of simultanious accepted connections.")
-    parser.add_option(
-        '-s', '--status-server',
-        help=("Run a status server for getting pool information. "
-              "The argument is a unix-domain socket path to listen on."))
-    parser.add_option(
-        '-t', '--socket-timeout', type='float', default=99.,
-        help=('HTTP socket timeout.'))
+        '-e', '--disconnect-message',
+        help="Path to error page to use when a request is lost due to "
+        "worker disconnection"
+        )
     parser.add_option(
         '-L', '--logger-configuration',
         help=
@@ -142,15 +136,24 @@ def lbmain(args=None, run=True):
         "\n"
         "Alternatively, you can give a Python logger level name or number."
         )
+    parser.add_option('-l', '--access-logger', help='Access-log logger name.')
+    parser.add_option(
+        '-m', '--max-connections', type='int',
+        help="Maximum number of simultanious accepted connections.")
     parser.add_option(
         '-r', '--request-classifier', default='zc.resumelb.lb:host_classifier',
         help="Request classification function (module:expr)"
         )
     parser.add_option(
-        '-e', '--disconnect-message',
-        help="Path to error page to use when a request is lost due to "
-        "worker disconnection"
-        )
+        '-s', '--status-server',
+        help=("Run a status server for getting pool information. "
+              "The argument is a unix-domain socket path to listen on."))
+    parser.add_option(
+        '-t', '--socket-timeout', type='float', default=99.,
+        help=('HTTP socket timeout.'))
+    parser.add_option(
+        '-v', '--single-version', action='store_true',
+        help=('Only use a single worker version.'))
 
     try:
         options, args = parser.parse_args(args)
@@ -190,15 +193,33 @@ def lbmain(args=None, run=True):
         disconnect_message = zc.resumelb.lb.default_disconnect_message
 
     from zc.resumelb.lb import LB
-    lb = LB(map(zc.parse_addr.parse_addr, addrs),
-            request_classifier, disconnect_message)
+    lb = LB(map(zc.parse_addr.parse_addr, ()),
+            request_classifier, disconnect_message,
+            single_version=options.single_version)
 
+
+    to_send = [[]]
     # Set up notification of address changes.
     awatcher = gevent.get_hub().loop.async()
     @awatcher.start
     def _():
-        lb.set_worker_addrs(map(zc.parse_addr.parse_addr, addrs))
-    addrs(lambda a: awatcher.send())
+        lb.set_worker_addrs(to_send[0])
+
+    if options.single_version:
+        @addrs
+        def get_addrs(a):
+            to_send[0] = dict(
+                (zc.parse_addr.parse_addr(addr),
+                 zk.get_properties(
+                     path+'/workers/providers/'+addr).get('version')
+                 )
+                for addr in addrs)
+            awatcher.send()
+    else:
+        @addrs
+        def get_addrs(a):
+            to_send[0] = map(zc.parse_addr.parse_addr, addrs)
+            awatcher.send()
 
     # Set up notification of address changes.
     settings = zk.properties(path)

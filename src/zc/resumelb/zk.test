@@ -2,7 +2,7 @@
 ZooKeeper integration
 =====================
 
-    >>> import zc.resumelb.zk, zc.resumelb.tests, zc.zk
+    >>> import gevent, mock, zc.resumelb.zk, zc.resumelb.tests, zc.zk
     >>> zk = zc.zk.ZooKeeper('zookeeper.example.com:2181')
 
 To demonstrate the integration, we'll set up a tree:
@@ -61,7 +61,7 @@ version
 Let's create a worker, making sure that ZConfig.configureLoggers was called.
 
     >>> app = zc.resumelb.tests.app()
-    >>> import mock, marshal
+    >>> import marshal
     >>> with open('resume.mar', 'w') as f:
     ...     marshal.dump(dict(a=1.0, b=2.0), f)
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
@@ -120,7 +120,7 @@ Shutdown
 A shutdown signal handler is registered.  We can call it to shut the
 worker down:
 
-    >>> import gevent, signal
+    >>> import signal
     >>> gevent.signal.call_args[0][0] == signal.SIGTERM
     True
 
@@ -197,32 +197,33 @@ string, the string is split and testing mode (run=False) is assumed.
       -h, --help            show this help message and exit
       -a ADDRESS, --address=ADDRESS
                             Address to listed on for web requests
-      -l ACCESS_LOGGER, --access-logger=ACCESS_LOGGER
-                            Access-log logger name.
       -b BACKLOG, --backlog=BACKLOG
                             Server backlog setting.
       -d, --backdoor        Run a backdoor server. Use with caution!
-      -m MAX_CONNECTIONS, --max-connections=MAX_CONNECTIONS
-                            Maximum number of simultanious accepted
-                            connections.
-      -s STATUS_SERVER, --status-server=STATUS_SERVER
-                            Run a status server for getting pool
-                            information. The argument is a unix-domain
-                            socket path to listen on.
-      -t SOCKET_TIMEOUT, --socket-timeout=SOCKET_TIMEOUT
-                            HTTP socket timeout.
+      -e DISCONNECT_MESSAGE, --disconnect-message=DISCONNECT_MESSAGE
+                            Path to error page to use when a request is
+                            lost due to worker disconnection
       -L LOGGER_CONFIGURATION, --logger-configuration=LOGGER_CONFIGURATION
                             Read logger configuration from the given
                             configuration file path.  The configuration
                             file must be in ZConfig logger configuration
                             syntax. Alternatively, you can give a Python
                             logger level name or number.
+      -l ACCESS_LOGGER, --access-logger=ACCESS_LOGGER
+                            Access-log logger name.
+      -m MAX_CONNECTIONS, --max-connections=MAX_CONNECTIONS
+                            Maximum number of simultanious accepted
+                            connections.
       -r REQUEST_CLASSIFIER, --request-classifier=REQUEST_CLASSIFIER
                             Request classification function
                             (module:expr)
-      -e DISCONNECT_MESSAGE, --disconnect-message=DISCONNECT_MESSAGE
-                            Path to error page to use when a request is
-                            lost due to worker disconnection
+      -s STATUS_SERVER, --status-server=STATUS_SERVER
+                            Run a status server for getting pool
+                            information. The argument is a unix-domain
+                            socket path to listen on.
+      -t SOCKET_TIMEOUT, --socket-timeout=SOCKET_TIMEOUT
+                            HTTP socket timeout.
+      -v, --single-version  Only use a single worker version.
 
 
 Let's start with a simple call:
@@ -487,8 +488,7 @@ Finally, let's test that:
     >>> print sock.recv(9999) # doctest: +ELLIPSIS
     HTTP/1.0 200 OK...
 
-    >>> server.stop()
-    >>> lb.stop()
+    >>> lb_greenlet.kill()
 
 Try a numeric log level:
 
@@ -501,5 +501,38 @@ Try a numeric log level:
     ...     if configureLoggers.called: print 'configureLoggers'
     ...     basicConfig.assert_called_with(level=42)
 
-    >>> server.stop()
-    >>> lb.stop()
+
+    >>> lb_greenlet.kill()
+    >>> worker_greenlet.kill()
+
+Single-version load balancer
+=============================
+
+If only one version of your application should run at a time, you can
+use the single-version (``-v``, ``--single-version``) option.  Your
+workers must register with a version, or they'll be ignored.
+
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     worker = zc.resumelb.zk.worker(
+    ...         app, None,
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         address='127.0.0.1:0', run=False, version='42')
+    >>> gevent.sleep(.01)
+    >>> lb, server = zc.resumelb.zk.lbmain(
+    ...     'zookeeper.example.com:2181 /test/lb -v')
+    >>> gevent.sleep(1)
+    >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
+    ...   with mock.patch('logging.basicConfig') as basicConfig:
+    ...     worker = zc.resumelb.zk.worker(
+    ...         app, None,
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         address='127.0.0.1:0', run=False, version='42')
+    >>> gevent.sleep(.01)
+    >>> lb.pool
+    Version: 42
+    Request classes:
+    Backlogs:
+      overall backlog: 0 Decayed: 0 Avg: 0
+      0: [127.0.0.1:39208, 127.0.0.1:60073]
+

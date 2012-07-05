@@ -242,6 +242,15 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.7.0 (2012-07-05)
+------------------
+
+- Added support in the load balancer for applications that can't have
+  multiple worker versions.  You can upgrade workers
+  gradually. Workers with the new version will be ignored until
+  they're in the majority, at which time the lb will stop using
+  workers with the old version.
+
 0.6.2 (2012-06-15)
 ------------------
 
