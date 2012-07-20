@@ -341,7 +341,7 @@ Now, we'll add a new worker:
     >>> w6 = Worker('w6')
     >>> pool.new_resume(w6, {})
 
-And wen we make a request, it will go to the new worker:
+And when we make a request, it will go to the new worker:
 
     >>> pool.get('bar')
     w6
