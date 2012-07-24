@@ -30,10 +30,13 @@ class LB:
 
     def __init__(self, worker_addrs, classifier,
                  disconnect_message=default_disconnect_message,
+                 pool_factory=None,
                  **pool_settings):
         self.classifier = classifier
         self.disconnect_message = disconnect_message
-        self.pool = Pool(**pool_settings)
+        if pool_factory is None:
+            pool_factory = Pool
+        self.pool = pool_factory(**pool_settings)
         self.update_settings = self.pool.update_settings
         self.workletts = {}
         self.set_worker_addrs(worker_addrs)
