@@ -312,10 +312,18 @@ outstanding to have a case with a worker backlog:
      u'mean_backlog': 0.6...,
      u'workers': [...]}
 
-    >>> sorted(status['workers'], key=lambda w: w[2])
+    >>> pprint(sorted(status['workers'], key=lambda x: x['backlog']))
     ... # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
-    [[u'127.0.0.1:...', 0, 0, None],
-     [u'127.0.0.1:...', 1, 0.6..., 13...]]
+    [{u'backlog': 0,
+      u'mbacklog': 0,
+      u'name': u'127.0.0.1:...',
+      u'oldest_time': None,
+      u'version': None},
+     {u'backlog': 1,
+      u'mbacklog': 0.6...,
+      u'name': u'127.0.0.1:...',
+      u'oldest_time': 13...,
+      u'version': None}]
 
     >>> status_file.close()
     >>> status_socket.close()

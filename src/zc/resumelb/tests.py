@@ -310,7 +310,7 @@ def pool_status():
     >>> status = pool.status()
     >>> status['backlog']
     0
-    >>> status['workers'][0][0]
+    >>> status['workers'][0]['name']
     'foo'
     """
 

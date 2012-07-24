@@ -332,7 +332,11 @@ def get_lb_status(args=None):
                 )
             print
             print worker_format % ('worker', 'backlog', 'mean bl', 'age')
-            for name, bl, mbl, start in workers:
+            for w in workers:
+                name, bl, mbl, start = (w['name'],
+                        w['backlog'],
+                        w['mbacklog'],
+                        w['oldest_time'])
                 print worker_format % (
                     name, bl, "%.1f" % mbl,
                     now-start if start is not None else '-')

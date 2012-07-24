@@ -335,12 +335,13 @@ class Pool:
                 backlog = self.backlog,
                 mean_backlog = self.mbacklog,
                 workers = [
-                    (worker.__name__,
-                     worker.backlog,
-                     worker.mbacklog,
-                     (int(worker.oldest_time)
-                      if worker.oldest_time else None),
-                     )
+                    dict(name=worker.__name__,
+                        backlog=worker.backlog,
+                        mbacklog=worker.mbacklog,
+                        oldest_time=(int(worker.oldest_time)
+                                        if worker.oldest_time else None),
+                        version=worker.version
+                        )
                     for worker in sorted(
                         self.workers, key=lambda w: w.__name__)
                     ])
