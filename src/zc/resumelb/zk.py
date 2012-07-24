@@ -214,7 +214,7 @@ def lbmain(args=None, run=True):
     def _():
         lb.set_worker_addrs(to_send[0])
 
-    if options.single_version:
+    if options.single_version or pool_factory != zc.resumelb.lb.Pool:
         @addrs
         def get_addrs(a):
             to_send[0] = dict(

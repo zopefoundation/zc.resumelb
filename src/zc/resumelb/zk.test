@@ -562,3 +562,9 @@ Our pool is an instance of the TestPool class we specified:
 
     >>> isinstance(lb.pool, zc.resumelb.tests.TestPool)
     True
+
+This also causes the loadbalancer to load the worker versions as the new pool
+factory may need them:
+
+    >>> print list(lb.pool.workers)[0].version
+    42
