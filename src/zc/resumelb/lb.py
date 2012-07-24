@@ -330,6 +330,21 @@ class Pool:
             worker.backlog -= 1
             _decay_backlog(worker, self.worker_decay)
 
+    def status(self):
+        return dict(
+                backlog = self.backlog,
+                mean_backlog = self.mbacklog,
+                workers = [
+                    (worker.__name__,
+                     worker.backlog,
+                     worker.mbacklog,
+                     (int(worker.oldest_time)
+                      if worker.oldest_time else None),
+                     )
+                    for worker in sorted(
+                        self.workers, key=lambda w: w.__name__)
+                    ])
+
 def _init_backlog(worker):
     worker.backlog = worker.nbacklog = worker.dbacklog = worker.mbacklog = 0
 

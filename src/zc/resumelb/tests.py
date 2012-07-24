@@ -297,6 +297,23 @@ def zk_wsgi_server_output_timeout():
 
     """
 
+def pool_status():
+    """
+    We can ask the pool for it's status. It will give us back a dictionary.
+
+    >>> worker = mock.Mock()
+    >>> worker.__name__ = 'foo'
+    >>> worker.oldest_time = 1.0
+    >>> pool = zc.resumelb.lb.Pool()
+    >>> pool.new_resume(worker, {})
+
+    >>> status = pool.status()
+    >>> status['backlog']
+    0
+    >>> status['workers'][0][0]
+    'foo'
+    """
+
 def test_classifier(env):
     return "yup, it's a test"
 
