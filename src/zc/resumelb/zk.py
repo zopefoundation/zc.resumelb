@@ -100,6 +100,12 @@ class WSGIServer(gevent.pywsgi.WSGIServer):
         socket.settimeout(self.__socket_timeout)
         return gevent.pywsgi.WSGIServer.handle(self, socket, address)
 
+def _resolve(path):
+    rcmod, rcexpr = path.split(':')
+    __import__(rcmod)
+    rcmod = sys.modules[rcmod]
+    return eval(rcexpr, rcmod.__dict__)
+
 def lbmain(args=None, run=True):
     """%prog [options] zookeeper_connection path
 
@@ -145,6 +151,10 @@ def lbmain(args=None, run=True):
         help="Request classification function (module:expr)"
         )
     parser.add_option(
+        '-p', '--pool-factory', default='zc.resumelb.lb:Pool',
+        help="Callable which creates a pool (module:expr). Will be called with settings as keyword arguments."
+        )
+    parser.add_option(
         '-s', '--status-server',
         help=("Run a status server for getting pool information. "
               "The argument is a unix-domain socket path to listen on."))
@@ -180,10 +190,8 @@ def lbmain(args=None, run=True):
 
     zk = zc.zk.ZooKeeper(zookeeper)
     addrs = zk.children(path+'/workers/providers')
-    rcmod, rcexpr = options.request_classifier.split(':')
-    __import__(rcmod)
-    rcmod = sys.modules[rcmod]
-    request_classifier = eval(rcexpr, rcmod.__dict__)
+    request_classifier = _resolve(options.request_classifier)
+    pool_factory = _resolve(options.pool_factory)
 
     disconnect_message = options.disconnect_message
     if disconnect_message:
@@ -195,6 +203,7 @@ def lbmain(args=None, run=True):
     from zc.resumelb.lb import LB
     lb = LB(map(zc.parse_addr.parse_addr, ()),
             request_classifier, disconnect_message,
+            pool_factory=pool_factory,
             single_version=options.single_version)
 
 

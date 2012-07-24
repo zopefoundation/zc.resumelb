@@ -300,6 +300,9 @@ def zk_wsgi_server_output_timeout():
 def test_classifier(env):
     return "yup, it's a test"
 
+class TestPool(zc.resumelb.lb.Pool):
+    pass
+
 def setUp(test):
     zope.testing.setupstack.setUpDirectory(test)
     zope.testing.setupstack.context_manager(test, mock.patch('gevent.signal'))
