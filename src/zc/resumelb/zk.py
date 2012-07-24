@@ -267,22 +267,9 @@ def lbmain(args=None, run=True):
     if options.status_server:
         def status(socket, addr):
             pool = lb.pool
+            status = pool.status()
             writer = socket.makefile('w')
-            writer.write(json.dumps(
-                dict(
-                    backlog = pool.backlog,
-                    mean_backlog = pool.mbacklog,
-                    workers = [
-                        (worker.__name__,
-                         worker.backlog,
-                         worker.mbacklog,
-                         (int(worker.oldest_time)
-                          if worker.oldest_time else None),
-                         )
-                        for worker in sorted(
-                            pool.workers, key=lambda w: w.__name__)
-                        ]
-                    ))+'\n')
+            writer.write(json.dumps(status) + '\n')
             writer.close()
             socket.close()
 

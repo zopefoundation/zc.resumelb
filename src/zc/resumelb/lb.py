@@ -328,6 +328,21 @@ class Pool:
         assert worker.backlog >= 0
         _decay_backlog(worker, self.worker_decay)
 
+    def status(self):
+        return dict(
+                backlog = self.backlog,
+                mean_backlog = self.mbacklog,
+                workers = [
+                    (worker.__name__,
+                     worker.backlog,
+                     worker.mbacklog,
+                     (int(worker.oldest_time)
+                      if worker.oldest_time else None),
+                     )
+                    for worker in sorted(
+                        self.workers, key=lambda w: w.__name__)
+                    ])
+
 def _init_backlog(worker):
     worker.backlog  = getattr(worker,  'backlog', 0)
     worker.dbacklog = getattr(worker, 'dbacklog', worker.backlog)
