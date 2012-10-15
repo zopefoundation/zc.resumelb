@@ -143,8 +143,17 @@ class FauxWorker:
             ('127.0.0.1', 0), self.handle)
         server.start()
         self.addr = '127.0.0.1', server.server_port
+
     def handle(self, socket, addr):
-        self.socket = socket
+        if not hasattr(self, 'socket'):
+            self.socket = socket
+        else:
+            raise AssertionError("worker got too many connections", self.addr)
+
+    def close(self):
+        socket = self.socket
+        del self.socket
+        socket.close()
 
 def test_loading_recipes_with_no_history_argument():
     """A bug as introduced that caused resumes to be loaded
@@ -294,6 +303,49 @@ def zk_wsgi_server_output_timeout():
     >>> server.stop()
     >>> lb.stop()
     >>> zk.close()
+    """
+
+def flappy_set_worker_addrs_doesnt_cause_duplicate_connections():
+    """
+    >>> workers = [Worker() for i in range(2)]
+    >>> import zc.resumelb.lb
+    >>> lb = zc.resumelb.lb.LB([w.addr for w in workers],
+    ...                        zc.resumelb.lb.host_classifier, variance=4)
+
+    >>> wait(
+    ...     lambda :
+    ...     len([w for w in workers if hasattr(w, 'socket')]) == len(workers)
+    ...     )
+    >>> worker1, worker2 = [w.socket for w in workers]
+    >>> from zc.resumelb.util import read_message, write_message
+
+    >>> write_message(worker1, 0, {'h1.com': 10.0})
+    >>> write_message(worker2, 0, {'h2.com': 10.0})
+
+    >>> import gevent
+    >>> gevent.sleep(.01) # Give resumes time to arrive
+
+    >>> print lb.pool
+    Request classes:
+      h1.com: 127.0.0.1:49927(10.0,0)
+      h2.com: 127.0.0.1:36316(10.0,0)
+    Backlogs:
+      overall backlog: 0 Decayed: 0 Avg: 0
+      0: [127.0.0.1:49927, 127.0.0.1:36316]
+
+    Now, we'll flap the worker addrs:
+
+    >>> lb.set_worker_addrs([])
+    >>> lb.set_worker_addrs([w.addr for w in workers])
+    >>> gevent.sleep(.01) # Give resumes time to arrive
+
+    >>> print lb.pool
+    Request classes:
+      h1.com: 127.0.0.1:49927(10.0,0)
+      h2.com: 127.0.0.1:36316(10.0,0)
+    Backlogs:
+      overall backlog: 0 Decayed: 0 Avg: 0
+      0: [127.0.0.1:49927, 127.0.0.1:36316]
 
     """
 
@@ -366,6 +418,9 @@ def test_suite():
             'zk.test',
             setUp=zkSetUp, tearDown=zkTearDown),
         doctest.DocTestSuite(
-            setUp=zkSetUp, tearDown=zope.testing.setupstack.tearDown),
+            setUp=zkSetUp, tearDown=zope.testing.setupstack.tearDown,
+            checker = zope.testing.renormalizing.OutputChecker([
+                    (re.compile(r'127.0.0.1:\d+'), '127.0.0.1:P'),
+                    ])),
         ))
 

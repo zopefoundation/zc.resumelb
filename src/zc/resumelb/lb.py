@@ -44,31 +44,31 @@ class LB:
             addrs = dict((addr, None) for addr in addrs)
 
         workletts = self.workletts
-        old = list(workletts)
+
+        self.worker_addrs = addrs
         for addr in addrs:
             if addr not in workletts:
                 workletts[addr] = gevent.spawn(
                     self.connect, addr, workletts, addrs[addr])
 
-        for addr in old:
-            if addr not in addrs:
-                workletts.pop(addr)
-
     connect_sleep = 1.0
     def connect(self, addr, workletts, version):
-        while addr in workletts:
-            try:
-                socket = gevent.socket.create_connection(addr)
-                Worker(self.pool, socket, addr, version)
-            except gevent.GreenletExit, v:
+        try:
+            while addr in self.worker_addrs:
                 try:
-                    socket.close()
-                except:
-                    pass
-                raise
-            except Exception, v:
-                logger.exception('lb connecting to %r', addr)
-                gevent.sleep(self.connect_sleep)
+                    socket = gevent.socket.create_connection(addr)
+                    Worker(self.pool, socket, addr, version)
+                except gevent.GreenletExit, v:
+                    try:
+                        socket.close()
+                    except:
+                        pass
+                    raise
+                except Exception, v:
+                    logger.exception('lb connecting to %r', addr)
+                    gevent.sleep(self.connect_sleep)
+        finally:
+            del self.workletts[addr]
 
     def stop(self):
         for g in self.workletts.values():

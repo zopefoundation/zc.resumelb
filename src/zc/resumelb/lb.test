@@ -323,7 +323,7 @@ Now, let's send a partial response from the first GET:
 
 Now, we'll disconnect worker1:
 
-    >>> worker1.close()
+    >>> workers[0].close()
     >>> gevent.sleep(.1)
 
 The second GET and the HEAD request will be send to worker2:
@@ -406,8 +406,7 @@ that exists primarily for testing.  We'll change it on the lb.
     >>> lb.connect_sleep = 0.01
     >>> port = workers[0].server.server_port # We'll reuse below
     >>> workers[0].server.stop()
-    >>> socket = workers[0].socket
-    >>> socket.close()
+    >>> socket = workers[0].close()
     >>> gevent.sleep(.01)
     >>> len(lb.pool.workers)
     1
@@ -415,15 +414,15 @@ that exists primarily for testing.  We'll change it on the lb.
 OK, so we lost the worker and the lb didn't reconnect because the
 worker server is down:
 
-    >>> workers[0].socket is socket
-    True
+    >>> hasattr(workers[0], 'socket')
+    False
 
 Now, we'll recreate the worker server and after a bit, the lb should reconnect:
 
     >>> workers[0].server = gevent.server.StreamServer(
     ...     ('127.0.0.1', port), workers[0].handle)
     >>> workers[0].server.start()
-    >>> wait(lambda : workers[0].socket is not socket)
+    >>> wait(lambda : hasattr(workers[0], 'socket'))
     >>> write_message(workers[0].socket, 0, {'h3.com': 10.0})
     >>> gevent.sleep(.01)
     >>> len(lb.pool.workers)
@@ -498,7 +497,7 @@ addresses to versions, rather than a list.
 
 (only new workers are affected.)
 
-    >>> workers.pop(-1).socket.close()
+    >>> workers.pop(-1).close()
     >>> lb.set_worker_addrs([w.addr for w in workers])
 
 Graceful shutdown

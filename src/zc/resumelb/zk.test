@@ -441,7 +441,7 @@ Let's shut down the workers:
 
 We see that there are fewer workers:
 
-    >>> len(lb.workletts)
+    >>> len(lb.worker_addrs)
     0
 
 Not that if we looked at the number of pools, it would still be

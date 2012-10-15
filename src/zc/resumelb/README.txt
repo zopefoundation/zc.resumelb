@@ -242,6 +242,14 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.7.1 (2012-10-15)
+------------------
+
+- Fixed: When used with ZooKeeper, a load balancer could end up with
+  multiple connections to the same worker due to ZooKeeper
+  "flapping".  (ZooKeeper might report that workers had gone away and
+  come back without the workers actually going away.)
+
 0.7.0 (2012-07-05)
 ------------------
 
