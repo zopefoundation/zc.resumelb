@@ -155,6 +155,19 @@ class FauxWorker:
         del self.socket
         socket.close()
 
+class FauxPoolWorker:
+    def __init__(self, name):
+        self.name = name
+    def __repr__(self):
+        return self.name
+    def __cmp__(self, other):
+        return cmp(self.name, other.name)
+    def __hash__(self):
+        return hash(self.name)
+    def handle(self, *args):
+        pass
+
+
 def test_loading_recipes_with_no_history_argument():
     """A bug as introduced that caused resumes to be loaded
     incorrectly when no history was given to the constructor.  It
