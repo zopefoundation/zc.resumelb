@@ -347,6 +347,9 @@ def flappy_set_worker_addrs_doesnt_cause_duplicate_connections():
       overall backlog: 0 Decayed: 0 Avg: 0
       0: [127.0.0.1:49927, 127.0.0.1:36316]
 
+    >>> for w in workers:
+    ...     w.server.stop()
+    >>> lb.stop()
     """
 
 def test_classifier(env):
