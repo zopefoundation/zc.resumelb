@@ -210,6 +210,7 @@ class Pool:
             version = worker.version
             self.byversion[version].add(worker)
             if self.version is None:
+                logger.info('VERSION: %s', version)
                 self.version = version
             if version == self.version:
                 # Adding a worker to the quorum will always preserve the quorum
@@ -261,6 +262,7 @@ class Pool:
 
         for worker in byversion[self.version]:
             self._remove(worker)
+        logger.info('VERSION: %s', version)
         self.version = version
         for worker in byversion[version]:
             self._new_resume(worker, worker.resume)
