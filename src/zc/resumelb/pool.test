@@ -229,15 +229,12 @@ data.
     >>> pool.put(w1)
     >>> pool.put(w3)
     >>> pool.put(w3)
-    >>> pool.put(w3)
-    >>> pool.put(w3)
-    >>> pool.put(w3)
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.5...)
       foo: w5(0.5,1.5...), w2(2.0,1.5...), w3(3.8,1.2...), w1(5.9,2.7...)
     Backlogs:
-      overall backlog: 4 Decayed: 7.9... Avg: 1.5...
+      overall backlog: 7 Decayed: 8.4... Avg: 1.6...
       0: [w3, w4]
       2: [w2, w5]
       3: [w1]
@@ -251,13 +248,21 @@ Worker disconnect
 When a worker disconnect, it's removed from the pool:
 
     >>> pool.remove(w1)
+    >>> pool.put(w1)
+    >>> pool.put(w1)
+    >>> pool.put(w1)
+    >>> pool.put(w1)
+    >>> pool.put(w1)
     >>> pool.remove(w3)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
+    >>> pool.put(w3)
     >>> pool # doctest: +ELLIPSIS
     Request classes:
       bar: w2(2.0,1.57...)
       foo: w5(0.5,1.57...), w2(2.0,1.57...)
     Backlogs:
-      overall backlog: 1 Decayed: 7.1... Avg: 2.3...
+      overall backlog: 4 Decayed: 8.2... Avg: 2.7...
       0: [w4]
       2: [w2, w5]
 

@@ -87,20 +87,20 @@ class LB:
         while 1:
             worker = self.pool.get(rclass)
             try:
-                result = worker.handle(rclass, env, start_response)
-                self.pool.put(worker)
-                return result
+                return worker.handle(rclass, env, start_response)
             except zc.resumelb.util.Disconnected:
                 if (int(env.get('CONTENT_LENGTH', 0)) == 0 and
                     env.get('REQUEST_METHOD') in retry_methods
                     ):
-                    logger.info("retrying %s", env)
+                    logger.info("%s disconnected, retrying %s", worker, env)
                 else:
                     return webob.Response(
                         status = '502 Bad Gateway',
                         content_type= 'text/html',
                         body = self.disconnect_message
                         )(env, start_response)
+            finally:
+                self.pool.put(worker)
 
 class Pool:
 
@@ -240,11 +240,6 @@ class Pool:
             self.event.clear()
 
     def remove(self, worker):
-
-        self.backlog -= worker.backlog
-        assert self.backlog >= 0, self.backlog
-        _decay_backlog(self, self.decay)
-
         if self.single_version:
             self.byversion[worker.version].remove(worker)
             if worker.version == self.version:
@@ -323,9 +318,10 @@ class Pool:
         self.backlog -= 1
         assert self.backlog >= 0, self.backlog
         _decay_backlog(self, self.decay)
-        if worker.backlog > 0:
-            worker.backlog -= 1
-            _decay_backlog(worker, self.worker_decay)
+
+        worker.backlog -= 1
+        assert worker.backlog >= 0
+        _decay_backlog(worker, self.worker_decay)
 
 def _init_backlog(worker):
     worker.backlog  = getattr(worker,  'backlog', 0)

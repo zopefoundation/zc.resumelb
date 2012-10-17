@@ -102,6 +102,7 @@ Now, disconnect w4 and w5, the quorum will switch to version 1:
 
     >>> pool.remove(w4)
     >>> pool.remove(w5)
+    >>> pool.put(w5)
     >>> print pool # doctest: +ELLIPSIS
     Version: 1
       Inactive: 2: set([w3])
@@ -110,7 +111,7 @@ Now, disconnect w4 and w5, the quorum will switch to version 1:
       b: w1(1.0,0.48...)
       c: 
     Backlogs:
-      overall backlog: 2 Decayed: 2.58547913529 Avg: 1.29273956765
+      overall backlog: 2 Decayed: 2.5... Avg: 1.2...
       0: [w1]
       1: [w2]
 
@@ -122,6 +123,7 @@ If we make a request, it'll be handled by the bew quorum:
 If we remove the last version 2:
 
     >>> pool.remove(w3)
+    >>> pool.put(w3)
     >>> print pool # doctest: +ELLIPSIS
     Version: 1
     Request classes:
@@ -129,7 +131,7 @@ If we remove the last version 2:
       b: w1(1.0,0.66...)
       c: 
     Backlogs:
-      overall backlog: 2 Decayed: 2.56315626836 Avg: 1.28157813418
+      overall backlog: 2 Decayed: 2.5... Avg: 1.2...
       1: [w1, w2]
 
 We don't print inactive, since there aren't any.
