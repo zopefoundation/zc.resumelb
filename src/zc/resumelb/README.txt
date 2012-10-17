@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-0.7.1 (2012-10-15)
+0.7.1 (2012-10-17)
 ------------------
 
 - Fixed: When used with ZooKeeper, a load balancer could end up with
@@ -253,6 +253,8 @@ Change History
 - Fixed: When using single-version mode, flapping between versions
   could cause worker and book backlogs to be computed concorrectly,
   causing assertion errors.
+
+- In single-version mode, log version changes.
 
 0.7.0 (2012-07-05)
 ------------------
