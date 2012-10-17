@@ -250,6 +250,10 @@ Change History
   "flapping".  (ZooKeeper might report that workers had gone away and
   come back without the workers actually going away.)
 
+- Fixed: When using single-version mode, flapping between versions
+  could cause worker and book backlogs to be computed concorrectly,
+  causing assertion errors.
+
 0.7.0 (2012-07-05)
 ------------------
 

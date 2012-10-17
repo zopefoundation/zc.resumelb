@@ -313,6 +313,12 @@ Under heavy load, we should be able to add a worker and have it get
 used immediately.
 
     >>> pool.update_settings(dict(variance=1))
+
+    >>> def zero_workers(*workers):
+    ...     for worker in workers:
+    ...         worker.backlog=worker.nbacklog=worker.dbacklog=worker.mbacklog=0
+    >>> zero_workers(w1, w2, w3)
+
     >>> pool.new_resume(w1, {'bar': 2.0})
     >>> pool.new_resume(w2, {'bar': 2.0})
     >>> pool.new_resume(w3, {'bar': 2.0})

@@ -328,7 +328,10 @@ class Pool:
             _decay_backlog(worker, self.worker_decay)
 
 def _init_backlog(worker):
-    worker.backlog = worker.nbacklog = worker.dbacklog = worker.mbacklog = 0
+    worker.backlog  = getattr(worker,  'backlog', 0)
+    worker.dbacklog = getattr(worker, 'dbacklog', worker.backlog)
+    worker.nbacklog = getattr(worker, 'nbacklog', 0)
+    worker.mbacklog = getattr(worker, 'mbacklog', worker.backlog)
 
 def _decay_backlog(worker, decay):
     worker.dbacklog = worker.dbacklog*decay + worker.backlog

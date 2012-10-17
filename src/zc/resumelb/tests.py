@@ -156,8 +156,9 @@ class FauxWorker:
         socket.close()
 
 class FauxPoolWorker:
-    def __init__(self, name):
+    def __init__(self, name, version=None):
         self.name = name
+        self.version = version
     def __repr__(self):
         return self.name
     def __cmp__(self, other):
@@ -363,6 +364,41 @@ def flappy_set_worker_addrs_doesnt_cause_duplicate_connections():
     >>> for w in workers:
     ...     w.server.stop()
     >>> lb.stop()
+    """
+
+def dont_reset_worker_backlogs_if_they_already_have_them():
+    """
+    >>> pool = zc.resumelb.lb.Pool(single_version=True)
+
+We have a pool at version 1:
+
+    >>> w1 = FauxPoolWorker('1', '1')
+    >>> pool.new_resume(w1, {})
+    >>> for i in range(9):
+    ...    _ = pool.get('')
+
+    >>> pool.backlog
+    9
+
+We switch to version 2:
+
+    >>> w2 = FauxPoolWorker('2', '2')
+    >>> w3 = FauxPoolWorker('3', '2')
+    >>> pool.new_resume(w2, {})
+    >>> pool.new_resume(w3, {})
+
+    >>> pool.backlog
+    9
+    >>> pool.version
+    '2'
+
+Now, somehow, we switch back to version 1.  Not sure how:
+
+    >>> pool.remove(w2)
+    >>> pool.remove(w3)
+
+    >>> w1.backlog
+    9
     """
 
 def test_classifier(env):
