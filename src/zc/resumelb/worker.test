@@ -72,7 +72,7 @@ We also have a helper that consumes and prints a response:
     >>> print_response(worker_socket, 1)
     1 200 OK
     Content-Length: 79
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -118,7 +118,7 @@ and send them:
     >>> print_response(worker_socket, 4) # doctest: +NORMALIZE_WHITESPACE
     4 200 OK
     Content-Length: 84
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -130,7 +130,7 @@ and send them:
     >>> print_response(worker_socket, 2) # doctest: +NORMALIZE_WHITESPACE
     2 200 OK
     Content-Length: 82
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -142,7 +142,7 @@ and send them:
     >>> print_response(worker_socket, 3) # doctest: +NORMALIZE_WHITESPACE
     3 200 OK
     Content-Length: 83
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -162,7 +162,7 @@ making a 5th request.
     >>> print_response(worker_socket, 5)
     5 200 OK
     Content-Length: 12
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     hello world
 
@@ -252,7 +252,7 @@ And pretty much repeat the multi-connection test we did for one worker:
     >>> print_response(worker_socket, 4) # doctest: +NORMALIZE_WHITESPACE
     4 200 OK
     Content-Length: 84
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -266,7 +266,7 @@ And on with our simultaneous request on multiple worker test.
     >>> print_response(worker_socket2, 4) # doctest: +NORMALIZE_WHITESPACE
     4 200 OK
     Content-Length: 84
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -278,7 +278,7 @@ And on with our simultaneous request on multiple worker test.
     >>> print_response(worker_socket, 2) # doctest: +NORMALIZE_WHITESPACE
     2 200 OK
     Content-Length: 82
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -290,7 +290,7 @@ And on with our simultaneous request on multiple worker test.
     >>> print_response(worker_socket2, 2) # doctest: +NORMALIZE_WHITESPACE
     2 200 OK
     Content-Length: 82
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -358,7 +358,7 @@ If we finish the outstanding requests, the worker will finish shutting down:
     >>> print_response(worker_socket, 3) # doctest: +NORMALIZE_WHITESPACE
     3 200 OK
     Content-Length: 83
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -370,7 +370,7 @@ If we finish the outstanding requests, the worker will finish shutting down:
     >>> print_response(worker_socket2, 3) # doctest: +NORMALIZE_WHITESPACE
     3 200 OK
     Content-Length: 83
-    Content-Type: text/html; charset=UTF-8; charset=UTF-8
+    Content-Type: text/html; charset=UTF-8
     <BLANKLINE>
     <BLANKLINE>
     <BLANKLINE>
@@ -515,7 +515,7 @@ Now, we'll read data until we get a response record for request 8:
     7 ('200 OK', [('Content-Type', 'text/html; charset=UTF-8'), ('
     ...
     7 'hello world\nhello world\nhello world\nhello world\nhello w
-    8 ('200 OK', [('Content-Type', 'text/html; charset=UTF-8; char
+    8 ('200 OK', [('Content-Type', 'text/html; charset=UTF-8'), ('
 
 Note that we didn't get output for requests 4, 5 or 6, because they
 were cancelled before they were started or before they started sending
