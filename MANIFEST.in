@@ -1,0 +1,7 @@
+include buildout.cfg
+include versions.cfg
+include simul_setup.py
+include resumelb.spec
+include rpm.cfg
+include tree.text
+recursive-include src/zc/resumelb *.txt *.test
