@@ -18,7 +18,7 @@ def read_message(sock):
     data = ''
     while len(data) < 8:
         try:
-            recieved = sock.recv(8-len(data))
+            received = sock.recv(8-len(data))
         except socket.error, err:
             if err.args[0] in disconnected_errors:
                 logger.debug("write_message disconnected %s", sock)
@@ -26,20 +26,20 @@ def read_message(sock):
             else:
                 raise
 
-        if not recieved:
+        if not received:
             logger.info("read_message disconnected %s", sock)
             raise Disconnected()
-        data += recieved
+        data += received
 
     rno, l = unpack(">II", data)
 
     data = ''
     while len(data) < l:
-        recieved = sock.recv(l-len(data))
-        if not recieved:
+        received = sock.recv(l-len(data))
+        if not received:
             logger.info("read_message disconnected %s", sock)
             raise Disconnected()
-        data += recieved
+        data += received
 
     return rno, loads(data)
 
