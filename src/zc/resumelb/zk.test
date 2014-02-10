@@ -106,7 +106,9 @@ subnode of the given path:
     True
 
     >>> meta = zk.get('/test/lb/workers/providers/' + waddr)[1]
-    >>> bool(meta['ephemeralOwner'])
+    >>> ephemeralOwner = (meta['ephemeralOwner'] if isinstance(meta, dict)
+    ...                   else meta.ephemeralOwner)
+    >>> bool(ephemeralOwner)
     True
 
 And provides some meta data:
@@ -387,7 +389,7 @@ the options!
     >>> [addr] = map(zc.parse_addr.parse_addr,
     ...              zk.get_children('/test/lb/providers'))
 
-    >>> addr[0]
+    >>> str(addr[0])
     'localhost'
 
     >>> len(lb.pool.workers)
