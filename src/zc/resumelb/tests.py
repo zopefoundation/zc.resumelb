@@ -292,7 +292,7 @@ def zk_wsgi_server_output_timeout():
     ...     'zookeeper.example.com:2181 /test/lb -t.2')
 
     >>> [addr] = map(zc.parse_addr.parse_addr,
-    ...              zk.get_children('/test/lb/providers'))
+    ...              zk.get_children('/test/lb/providers'))[:1]
 
     Now we'll make a request, but not consume output.  It should
     timeout after .2 seconds:
