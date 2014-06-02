@@ -194,6 +194,17 @@ In this example, we've also requested a very large output.
     <BLANKLINE>
     1200000
 
+Keep-alive messages
+===================
+
+Occassionally, the server will send keep-alive messages to the worker.
+These are ignored. They're used by the server to detect that a worker
+has been disconnected uncleanly.
+
+    >>> write_message(worker_socket, 0, None)
+
+These messages are ignored by the worker.
+
 Multiple connections (multiple load balancers)
 ==============================================
 

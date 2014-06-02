@@ -437,8 +437,15 @@ class Worker(zc.resumelb.util.LBWorker):
             del self.requests[rno]
 
     def disconnected(self):
+        # keep-alive messages send after disconnecting can cause
+        # disconnected to be called a second time.  To avoid this, we
+        # replace the method on the instance with a noop.
+        self.disconnected = already_disconnected
         self.pool.remove(self)
         zc.resumelb.util.Worker.disconnected(self)
+
+def already_disconnected():
+    pass
 
 def parse_addr(addr):
     host, port = addr.split(':')
