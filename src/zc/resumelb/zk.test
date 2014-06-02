@@ -315,6 +315,10 @@ outstanding to have a case with a worker backlog:
     [[u'127.0.0.1:...', 0, 0, None],
      [u'127.0.0.1:...', 1, 0.6..., 1...]]
 
+    >>> sorted(status['workers_ex'])
+    ... # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [[u'127.0.0.1:DDDD', 0], [u'127.0.0.1:DDDD', 0]]
+
     >>> status_file.close()
     >>> status_socket.close()
 
@@ -326,8 +330,8 @@ There's also a command-line client for the status server:
       workers: 2, mean backlog per worker: 0.3
     <BLANKLINE>
                             worker backlog mean bl     age
-                   127.0.0.1:52308       0     0.0       -
                    127.0.0.1:48407       1     0.7       0
+                   127.0.0.1:52308       0     0.0       -
 
 
     >>> sock.close()

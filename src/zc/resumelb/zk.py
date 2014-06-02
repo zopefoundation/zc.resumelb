@@ -272,7 +272,14 @@ def lbmain(args=None, run=True):
                          )
                         for worker in sorted(
                             pool.workers, key=lambda w: w.__name__)
-                        ]
+                        ],
+                    workers_ex = [
+                        (worker.__name__,
+                         worker.write_queue.qsize(),
+                         )
+                        for worker in sorted(
+                            pool.workers, key=lambda w: w.__name__)
+                        ],
                     ))+'\n')
             writer.close()
             socket.close()
@@ -335,8 +342,9 @@ def get_lb_status(args=None):
                 len(workers), status['mean_backlog'] / len(workers),
                 )
             print
-            print worker_format % ('worker', 'backlog', 'mean bl', 'age')
-            for name, bl, mbl, start in workers:
+            print worker_format % (
+                'worker', 'backlog', 'mean bl', 'age')
+            for name, bl, mbl, start in sorted(workers):
                 print worker_format % (
                     name, bl, "%.1f" % mbl,
                     now-start if start is not None else '-')
