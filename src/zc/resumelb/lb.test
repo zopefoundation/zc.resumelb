@@ -209,7 +209,7 @@ Periodically, the lb sends keep-alive messages to workers:
     >>> zc.resumelb.util.read_message(worker1)
     (0, None)
 
-workers ignore these.
+Workers ignore these.
 
 Disconnecting clients
 =====================
