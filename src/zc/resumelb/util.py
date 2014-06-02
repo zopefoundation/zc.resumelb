@@ -197,7 +197,7 @@ class Worker:
         logger.info('worker connected %s', addr)
         self.addr = addr
         self.readers = {}
-        writeq = ByteSizedQueue(queue_size_bytes)
+        self.write_queue = writeq = ByteSizedQueue(queue_size_bytes)
         gevent.Greenlet.spawn(writer, writeq, socket, self)
         self.put = writeq.put
         self.is_connected = True
