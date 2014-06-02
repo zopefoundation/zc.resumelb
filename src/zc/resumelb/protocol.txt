@@ -8,7 +8,12 @@ consist of:
 - 4-byte request number
 - Marshalled data
 
-The marshalled data can be:
+If request number is 0, the marshalled data:
+
+- resume dict from worker to lb
+- None from lb->worker, ignored keep alive
+
+For request number > 0, the marshalled data can be:
 
 - environment dict from LB->worker
 - string part of HTTP message body

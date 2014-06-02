@@ -55,7 +55,7 @@ def write_message(sock, rno, *a):
         try:
             sent = sock.send(data)
         except socket.error, err:
-            if err.args[0] in disconnected_errors:
+            if err.args[0] in disconnected_errors or sock.closed:
                 logger.debug("write_message disconnected %s", sock)
                 raise Disconnected()
             else:
@@ -65,8 +65,13 @@ def write_message(sock, rno, *a):
 def writer(writeq, sock, multiplexer):
     get = writeq.get
     write_message_ = write_message
+    timeout = multiplexer.write_keepalive_interval
     while 1:
-        rno, data = get()
+        try:
+            rno, data = get(True, timeout)
+        except gevent.queue.Empty:
+            rno = 0
+            data = None
         try:
             write_message_(sock, rno, data)
         except Disconnected:
@@ -191,6 +196,8 @@ class Worker:
 
     ReadQueue = gevent.queue.Queue
 
+    write_keepalive_interval = None
+
     def connected(self, socket, addr=None):
         if addr is None:
             addr = socket.getpeername()
@@ -229,6 +236,8 @@ class Worker:
         self.put = self.put_disconnected
 
 class LBWorker(Worker):
+
+    write_keepalive_interval = 0.1
 
     ReadQueue = BufferedQueue
 

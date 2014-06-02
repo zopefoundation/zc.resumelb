@@ -35,7 +35,7 @@ to these addresses. Let's wait for it to do so:
 When the workers get connections, they send the lb their resumes:
 
     >>> worker1, worker2 = [w.socket for w in workers]
-    >>> from zc.resumelb.util import read_message, write_message
+    >>> from zc.resumelb.util import write_message
 
     >>> write_message(worker1, 0, {'h1.com': 10.0})
     >>> write_message(worker2, 0, {'h2.com': 10.0})
@@ -50,6 +50,12 @@ supposed to go.
     >>> app1 = webtest.TestApp(lb.handle_wsgi)
     >>> g1 = spawn(app1.get, '/hi.html', {}, [('Host', 'h1.com')])
 
+    >>> import zc.resumelb.util
+    >>> def read_message(sock): # filter out keep alives
+    ...     while 1:            # we'll look at them later
+    ...         rno, data = zc.resumelb.util.read_message(sock)
+    ...         if rno != 0 or data is not None:
+    ...             return rno, data
     >>> rno, env1 = read_message(worker1)
 
     >>> rno
@@ -193,6 +199,17 @@ We'll interleave data for the 2 responses on worker1
     >>> g2.join(1.0)
     >>> g2.value.status, g2.value.body == '2'*10000
     ('200 OK', True)
+
+Keep-alive messages
+===================
+
+Periodically, the lb sends keep-alive messages to workers:
+
+    >>> gevent.sleep(.15)
+    >>> zc.resumelb.util.read_message(worker1)
+    (0, None)
+
+workers ignore these.
 
 Disconnecting clients
 =====================

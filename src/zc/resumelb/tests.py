@@ -423,6 +423,11 @@ def setUp(test):
     test.globs['print_response'] = print_response
     test.globs['spawn'] = spawn
     test.globs['Worker'] = FauxWorker
+    old_write_keepalive_interval = zc.resumelb.util.LBWorker.write_keepalive_interval
+    zc.resumelb.util.LBWorker.write_keepalive_interval = 0.1
+    zope.testing.setupstack.register(
+        test, setattr, zc.resumelb.util.LBWorker,
+        'write_keepalive_interval', old_write_keepalive_interval)
 
 def zkSetUp(test):
     setUp(test)

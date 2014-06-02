@@ -242,6 +242,9 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+- Added keep-alive messages from load balancers to workers to detect
+  workers that have gone away uncleanly.
+
 0.7.1 (2012-10-17)
 ------------------
 
