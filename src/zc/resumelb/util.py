@@ -1,5 +1,6 @@
 from struct import pack, unpack
 from marshal import loads, dumps, dump, load
+
 import errno
 import gevent.queue
 import logging
@@ -62,21 +63,49 @@ def write_message(sock, rno, *a):
                 raise
         data = data[sent:]
 
+SEND_SIZE = 1 << 16
+KEEP_ALIVE = pack(">II", 0, 1) + 'N'
 def writer(writeq, sock, multiplexer):
     get = writeq.get
     write_message_ = write_message
     timeout = multiplexer.write_keepalive_interval
+    Empty = gevent.queue.Empty
+    send = sock.send
+    dumps_ = dumps
+    pack_ = pack
     while 1:
         try:
             rno, data = get(True, timeout)
-        except gevent.queue.Empty:
-            rno = 0
-            data = None
-        try:
-            write_message_(sock, rno, data)
-        except Disconnected:
-            multiplexer.disconnected()
-            return
+        except Empty:
+            data = KEEP_ALIVE
+        else:
+            to_send = []
+            append = to_send.append
+            nsend = 0
+            while 1:
+                data = dumps_(data)
+                append(pack_(">II", rno, len(data)))
+                append(data)
+                nsend += len(data) + 8
+                if nsend > SEND_SIZE:
+                    break
+                try:
+                    rno, data = get(False)
+                except Empty:
+                    break
+            data = ''.join(to_send)
+
+        while data:
+            try:
+                sent = send(data)
+            except socket.error, err:
+                if err.args[0] in disconnected_errors or sock.closed:
+                    logger.debug("write_message disconnected %s", sock)
+                    multiplexer.disconnected()
+                    return
+                else:
+                    raise
+            data = data[sent:]
 
 
 queue_size_bytes = 99999
