@@ -7,6 +7,7 @@ import gevent.socket
 import llist
 import logging
 import re
+import socket
 import sys
 import time
 import webob
@@ -56,11 +57,13 @@ class LB:
         try:
             while addr in self.worker_addrs:
                 try:
-                    socket = gevent.socket.create_connection(addr)
-                    Worker(self.pool, socket, addr, version)
+                    sock = gevent.socket.create_connection(addr)
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+                    Worker(self.pool, sock, addr, version)
                 except gevent.GreenletExit, v:
                     try:
-                        socket.close()
+                        sock.close()
                     except:
                         pass
                     raise

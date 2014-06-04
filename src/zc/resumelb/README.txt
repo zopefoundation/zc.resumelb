@@ -242,8 +242,16 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+- Added some optimizations to reduce latency between load balancers
+  and workers.
+
+0.7.2 (2014-06-02)
+------------------
+
 - Added keep-alive messages from load balancers to workers to detect
   workers that have gone away uncleanly.
+
+  (Note that workers don't have to be updated.)
 
 0.7.1 (2012-10-17)
 ------------------

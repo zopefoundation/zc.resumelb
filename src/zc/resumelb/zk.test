@@ -268,7 +268,7 @@ Then we'll make a simpler GET request:
     ... ''')
 
     >>> print sock.recv(9999) # doctest: +ELLIPSIS
-    HTTP/1.0 200 OK...
+    HTTP/1.1 200 OK...
 
 If we create another worker, it will be seen by the load
 balancer. This time, we're not going to run the worker in test mode.
@@ -418,7 +418,7 @@ Let's do a request.
     ... \r
     ... ''')
     >>> print sock.recv(9999) # doctest: +ELLIPSIS
-    HTTP/1.0 200 OK...
+    HTTP/1.1 200 OK...
 
     >>> sock.close()
 
@@ -492,7 +492,7 @@ Finally, let's test that:
     ... \r
     ... ''')
     >>> print sock.recv(9999) # doctest: +ELLIPSIS
-    HTTP/1.0 200 OK...
+    HTTP/1.1 200 OK...
 
     >>> lb_greenlet.kill()
 
