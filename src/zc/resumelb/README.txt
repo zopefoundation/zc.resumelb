@@ -242,6 +242,9 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.7.3 (2014-06-04)
+------------------
+
 - Added some optimizations to reduce latency between load balancers
   and workers.
 
