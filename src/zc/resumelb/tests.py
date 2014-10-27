@@ -25,6 +25,7 @@ import mock
 import os
 import pprint
 import re
+import sys
 import time
 import traceback
 import unittest
@@ -89,6 +90,16 @@ def gsleep(dur=0):
 def app():
     return bobo.Application(bobo_resources=__name__)
 
+def generator_app(env, start):
+    start('200 OK', [('Content-type', 'text/plain'), ('Content-length', '2')])
+    yield 'h'
+    yield 'i'
+
+def generator_app0(env, start):
+    start('200 OK', [('Content-type', 'text/plain'), ('Content-length', '0')])
+    if False:
+        yield 'hi'
+
 #
 ###############################################################################
 
@@ -122,7 +133,7 @@ def print_response(worker_socket, rno, size_only=False):
             if size_only:
                 size += len(data)
             else:
-                print data,
+                sys.stdout.write(data)
         else:
             break
     if size_only:
@@ -399,6 +410,31 @@ Now, somehow, we switch back to version 1.  Not sure how:
 
     >>> w1.backlog
     9
+    """
+
+def generator_apps():
+    r"""PEP 333 allows WSGI apps to be implemented as generators.
+
+    This means that start_response may not becalled until after an app
+    has returned it's iterator (but before the first value is yielded.
+
+    Let's make sure workers handle this correctly.
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.generator_app, ('127.0.0.1', 0))
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> from zc.resumelb.util import read_message, write_message
+    >>> read_message(worker_socket)
+    (0, {})
+    >>> env = newenv('', '/')
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 200 OK
+    Content-length: 2
+    Content-type: text/plain
+    <BLANKLINE>
+    hi
+
     """
 
 def test_classifier(env):
