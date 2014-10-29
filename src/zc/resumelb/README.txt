@@ -242,6 +242,9 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.7.4 (2014-10-29)
+------------------
+
 - Fixed: Applications or middleware that didn't call the WSGI
   start_response function before returning an iterator weren't handled
   properly.
