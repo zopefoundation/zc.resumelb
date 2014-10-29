@@ -242,6 +242,13 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+- Fixed: Applications or middleware that didn't call the WSGI
+  start_response function before returning an iterator weren't handled
+  properly.
+
+- Fixed: File-descriptors leaked when load balancers disconnected from
+  workers.
+
 0.7.3 (2014-06-04)
 ------------------
 

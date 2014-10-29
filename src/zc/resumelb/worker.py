@@ -68,14 +68,25 @@ class Worker:
                 response[0] = (status, headers)
 
             try:
-                body = app(env, start_response)
+                body = iter(app(env, start_response))
+                try:
+                    first = body.next()
+                except StopIteration:
+                    first = ''
+                    if hasattr(body, 'close'):
+                        body.close()
+                    body = ()
             except Exception:
                 error("Uncaught application exception for %s" % trno)
                 import webob
-                body = webob.Response(
-                    'A system error occurred', status=500)(env, start_response)
+                body = iter(
+                    webob.Response(
+                        'A system error occurred', status=500
+                        )(env, start_response)
+                    )
+                first = body.next()
 
-            return response[0], body
+            return response[0], first, body
 
         if tracelog:
             info = logging.getLogger(tracelog).info
@@ -101,7 +112,7 @@ class Worker:
             def call_app_w_tracelog(trno, env):
                 log(trno, 'C')
                 env[tracelog_key] = ApplicationTraceLog(trno)
-                response, body = call_app(trno, env)
+                response, first, body = call_app(trno, env)
                 content_length = [v for (h, v) in response[1]
                                   if h.lower() == 'content-length']
                 content_length = content_length[-1] if content_length else '?'
@@ -114,7 +125,7 @@ class Worker:
                         if hasattr(body, 'close'):
                             body.close()
                         log(trno, 'E')
-                return response, body_iter()
+                return response, first, body_iter()
 
             if threads:
                 def call_app_w_threads(trno, env):
@@ -232,12 +243,16 @@ class Worker:
             if tracelog:
                 tracelog(trno, 'I', env.get('CONTENT_LENGTH') or '0')
 
-            response, body = self.call_app(trno, env)
+            response, first, body = self.call_app(trno, env)
             try:
                 requests = conn.readers
                 if rno not in requests:
                     return # cancelled
                 conn.put((rno, response))
+                if rno not in requests:
+                    return # cancelled
+                if first:
+                    conn.put((rno, first))
                 for data in body:
                     if rno not in requests:
                         return # cancelled
