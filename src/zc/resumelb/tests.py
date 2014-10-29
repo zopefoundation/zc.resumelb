@@ -90,15 +90,19 @@ def gsleep(dur=0):
 def app():
     return bobo.Application(bobo_resources=__name__)
 
-def generator_app(env, start):
-    start('200 OK', [('Content-type', 'text/plain'), ('Content-length', '2')])
-    yield 'h'
-    yield 'i'
-
 def generator_app0(env, start):
     start('200 OK', [('Content-type', 'text/plain'), ('Content-length', '0')])
     if False:
         yield 'hi'
+
+def generator_app1(env, start):
+    start('200 OK', [('Content-type', 'text/plain'), ('Content-length', '2')])
+    yield 'hi'
+
+def generator_app2(env, start):
+    start('200 OK', [('Content-type', 'text/plain'), ('Content-length', '2')])
+    yield 'h'
+    yield 'i'
 
 #
 ###############################################################################
@@ -420,10 +424,29 @@ def generator_apps():
 
     Let's make sure workers handle this correctly.
 
+    An app that yields no data (0 content-length)
+
     >>> worker = zc.resumelb.worker.Worker(
-    ...   zc.resumelb.tests.generator_app, ('127.0.0.1', 0))
+    ...   zc.resumelb.tests.generator_app0, ('127.0.0.1', 0))
     >>> worker_socket = gevent.socket.create_connection(worker.addr)
     >>> from zc.resumelb.util import read_message, write_message
+    >>> read_message(worker_socket)
+    (0, {})
+    >>> env = newenv('', '/')
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 200 OK
+    Content-length: 0
+    Content-type: text/plain
+    <BLANKLINE>
+
+    >>> worker.shutdown()
+
+    An app that yields it's content as one string:
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.generator_app1, ('127.0.0.1', 0))
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
     >>> read_message(worker_socket)
     (0, {})
     >>> env = newenv('', '/')
@@ -434,6 +457,76 @@ def generator_apps():
     Content-type: text/plain
     <BLANKLINE>
     hi
+
+    >>> worker.shutdown()
+
+    An app that yields it's content as multiple strings:
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.generator_app2, ('127.0.0.1', 0))
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> read_message(worker_socket)
+    (0, {})
+    >>> env = newenv('', '/')
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 200 OK
+    Content-length: 2
+    Content-type: text/plain
+    <BLANKLINE>
+    hi
+
+    >>> worker.shutdown()
+
+    Now, the same cases with trace logging:
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.generator_app0, ('127.0.0.1', 0), tracelog='t')
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> from zc.resumelb.util import read_message, write_message
+    >>> read_message(worker_socket)
+    (0, {})
+    >>> env = newenv('', '/')
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 200 OK
+    Content-length: 0
+    Content-type: text/plain
+    <BLANKLINE>
+
+    >>> worker.shutdown()
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.generator_app1, ('127.0.0.1', 0), tracelog='t')
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> read_message(worker_socket)
+    (0, {})
+    >>> env = newenv('', '/')
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 200 OK
+    Content-length: 2
+    Content-type: text/plain
+    <BLANKLINE>
+    hi
+
+    >>> worker.shutdown()
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.generator_app2, ('127.0.0.1', 0), tracelog='t')
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> read_message(worker_socket)
+    (0, {})
+    >>> env = newenv('', '/')
+    >>> write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 200 OK
+    Content-length: 2
+    Content-type: text/plain
+    <BLANKLINE>
+    hi
+
+    >>> worker.shutdown()
 
     """
 
