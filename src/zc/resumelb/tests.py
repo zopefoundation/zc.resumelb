@@ -419,8 +419,8 @@ Now, somehow, we switch back to version 1.  Not sure how:
 def generator_apps():
     r"""PEP 333 allows WSGI apps to be implemented as generators.
 
-    This means that start_response may not becalled until after an app
-    has returned it's iterator (but before the first value is yielded.
+    This means that start_response may not be called until after an app
+    has returned its iterator (but before the first value is yielded.
 
     Let's make sure workers handle this correctly.
 
@@ -442,7 +442,7 @@ def generator_apps():
 
     >>> worker.shutdown()
 
-    An app that yields it's content as one string:
+    An app that yields its content as one string:
 
     >>> worker = zc.resumelb.worker.Worker(
     ...   zc.resumelb.tests.generator_app1, ('127.0.0.1', 0))
@@ -460,7 +460,7 @@ def generator_apps():
 
     >>> worker.shutdown()
 
-    An app that yields it's content as multiple strings:
+    An app that yields its content as multiple strings:
 
     >>> worker = zc.resumelb.worker.Worker(
     ...   zc.resumelb.tests.generator_app2, ('127.0.0.1', 0))
