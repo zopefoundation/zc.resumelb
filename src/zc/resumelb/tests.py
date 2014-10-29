@@ -527,7 +527,27 @@ def generator_apps():
     hi
 
     >>> worker.shutdown()
+    """
 
+def worker_closes_socket():
+    """
+
+Disconnecting from a worker does not leak a file descriptor.
+
+    >>> worker = zc.resumelb.worker.Worker(
+    ...   zc.resumelb.tests.app(), ('127.0.0.1', 0))
+    >>> import gevent
+    >>> import gevent.socket
+    >>> sock = gevent.socket.create_connection(worker.addr)
+
+
+    >>> gevent.sleep(0.1)
+    >>> conn = list(worker.connections)[0]
+    >>> sock.close()
+    >>> gevent.sleep(0.1)
+
+    >>> conn.socket # doctest: +ELLIPSIS
+    <socket at 0x... fileno=[Errno 9] Bad file descriptor>
     """
 
 def test_classifier(env):
