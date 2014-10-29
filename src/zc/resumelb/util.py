@@ -237,6 +237,7 @@ class Worker:
         gevent.Greenlet.spawn(writer, writeq, socket, self)
         self.put = writeq.put
         self.is_connected = True
+        self.socket = socket
         return self.readers
 
     def __len__(self):
@@ -261,6 +262,7 @@ class Worker:
         self.is_connected = False
         for put in self.readers.itervalues():
             put(None)
+        self.socket.close()
 
         self.put = self.put_disconnected
 
