@@ -242,7 +242,7 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-- Fixed: Tracelogs disn't include start and stop records.
+- Fixed: Tracelogs didn't include start and stop records.
 
 0.7.4 (2014-10-29)
 ------------------
