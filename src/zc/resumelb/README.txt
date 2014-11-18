@@ -242,6 +242,9 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+0.7.5 (2014-11-18)
+------------------
+
 - Fixed: Tracelogs didn't include start and stop records.
 
 0.7.4 (2014-10-29)
