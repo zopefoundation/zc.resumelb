@@ -393,6 +393,9 @@ If we finish the outstanding requests, the worker will finish shutting down:
     >>> shutdown_greenlet.ready()
     True
 
+    >>> worker_socket.close()
+    >>> worker_socket2.close()
+
 Saving and loading resumes
 --------------------------
 
@@ -536,12 +539,23 @@ marker.
 
 cleanup
 
-    >>> worker.stop()
+    >>> worker.shutdown()
+    >>> worker_socket.close()
+    >>> gevent.sleep(1) # give outstanding connections time to settle down
 
 Tracelog and thread-pool support
 --------------------------------
 
 Workers support tracelogs and thread pools.
+
+If a tracelog argument is passed a logger name, then trace logs will
+be generated to the logger name.
+
+    >>> import logging, sys
+    >>> logger = logging.getLogger('tracelog')
+    >>> handler = logging.StreamHandler(sys.stdout)
+    >>> logger.addHandler(handler)
+    >>> logger.setLevel(logging.INFO)
 
 We're gonna be tricky and fake time, taking advantage of the knowledge
 that the worker constructor caches datetime.now when writing to trace logs:
@@ -553,26 +567,22 @@ that the worker constructor caches datetime.now when writing to trace logs:
     ...     worker = zc.resumelb.worker.Worker(
     ...       zc.resumelb.tests.app(), ('127.0.0.1', 0), history=2,
     ...       tracelog='tracelog', threads=1)
+    S 0 2012-02-05 01:02:03.000456
+
+We got an "S" record, indicating that the process started.
 
     >>> import zope.testing.loggingsupport
     >>> util_handler = zope.testing.loggingsupport.InstalledHandler(
     ...     'zc.resumelb.util')
 
     >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> gevent.sleep(.1)
+
     >>> pprint(read_message(worker_socket))
     (0, {})
 
 By passing a threads option, we said we want a thread pool of size
 one. This will serialize request processing.
-
-If a tracelog argument is passed a logger name, then trace logs will
-be generated to the logger name.
-
-    >>> import logging, sys
-    >>> logger = logging.getLogger('tracelog')
-    >>> handler = logging.StreamHandler(sys.stdout)
-    >>> logger.addHandler(handler)
-    >>> logger.setLevel(logging.INFO)
 
 Now, we'll make some requests:
 
@@ -632,7 +642,6 @@ this some more.
     E 1.22 2012-02-05 01:02:03.040456
     (22, ('200 OK', [('Content-Type', ...
 
-
 Also, note that the worker score is based on the time spent in app. It
 doesn't include time waiting.  We can see this when the worker sends
 us its resume:
@@ -646,14 +655,16 @@ us its resume:
 (If we started computing elapsed time when we started waiting for a
 thread, the score would be less than 2/(.1+.2).)
 
-Cleanup:
+.. cleanuo
 
-    >>> logger.removeHandler(handler)
-    >>> logger.setLevel(logging.NOTSET)
+    >>> _ = read_message(worker_socket2), read_message(worker_socket2)
+
+Shutting down the worker causes a stop trace log entry to be generated:
+
     >>> worker_socket.close()
-    >>> gevent.sleep(.01)
     >>> worker_socket2.close()
     >>> worker.stop()
+    X 0 2012-02-05 01:02:03.040456
 
 Connections and disconnections are logged and reflect the lb ids that
 show up in the trace logs. This allows us to match lb ids and lb
@@ -669,7 +680,10 @@ addresses.
     zc.resumelb.util INFO
       worker disconnected ('127.0.0.1', 50929)(1)...
 
+Cleanup:
 
+    >>> logger.removeHandler(handler)
+    >>> logger.setLevel(logging.NOTSET)
     >>> util_handler.uninstall()
 
 Updating worker settings

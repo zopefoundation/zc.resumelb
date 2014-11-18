@@ -99,6 +99,7 @@ class Worker:
                 else:
                     info(no_message_format, code, trno, now())
             tracelog = log
+            tracelog('0', "S") # process started
 
             class ApplicationTraceLog(object):
 
@@ -165,6 +166,8 @@ class Worker:
         self.server.stop()
         if hasattr(self, 'threadpool'):
             self.threadpool.kill()
+        if self.tracelog is not None:
+            self.tracelog('0', 'X')
 
     def shutdown(self):
         self.server.close()
