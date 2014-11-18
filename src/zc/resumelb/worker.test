@@ -662,6 +662,7 @@ thread, the score would be less than 2/(.1+.2).)
 Shutting down the worker causes a stop trace log entry to be generated:
 
     >>> worker_socket.close()
+    >>> gevent.sleep(.01) # Get disconnections are logged deterministically
     >>> worker_socket2.close()
     >>> worker.stop()
     X 0 2012-02-05 01:02:03.040456
