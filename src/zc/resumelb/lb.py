@@ -31,10 +31,13 @@ class LB:
 
     def __init__(self, worker_addrs, classifier,
                  disconnect_message=default_disconnect_message,
+                 pool_factory=None,
                  **pool_settings):
         self.classifier = classifier
         self.disconnect_message = disconnect_message
-        self.pool = Pool(**pool_settings)
+        if pool_factory is None:
+            pool_factory = Pool
+        self.pool = pool_factory(**pool_settings)
         self.update_settings = self.pool.update_settings
         self.workletts = {}
         self.set_worker_addrs(worker_addrs)
@@ -327,6 +330,29 @@ class Pool:
         worker.backlog -= 1
         assert worker.backlog >= 0
         _decay_backlog(worker, self.worker_decay)
+
+    def status(self):
+        return dict(
+            backlog = self.backlog,
+            mean_backlog = self.mbacklog,
+            workers = [
+                (worker.__name__,
+                 worker.backlog,
+                 worker.mbacklog,
+                 (int(worker.oldest_time)
+                  if worker.oldest_time else None),
+                 )
+                for worker in sorted(
+                    self.workers, key=lambda w: w.__name__)
+                ],
+            workers_ex = [
+                (worker.__name__,
+                 worker.write_queue.qsize(),
+                 )
+                for worker in sorted(
+                    self.workers, key=lambda w: w.__name__)
+                ],
+            )
 
 def _init_backlog(worker):
     worker.backlog  = getattr(worker,  'backlog', 0)

@@ -242,6 +242,10 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+- You can now supply alternative pool implementations.
+
+  Thanks to: https://github.com/zopefoundation/zc.resumelb/pull/3
+
 0.7.5 (2014-11-18)
 ------------------
 
