@@ -26,6 +26,7 @@ resumelb = zc.resumelb.lb:main
 zkresumelb = zc.resumelb.zk:lbmain
 get-worker-resume = zc.resumelb.worker:get_resume_main
 get-lb-status = zc.resumelb.zk:get_lb_status
+rlb-nagios = zc.resumelb.nagios:main
 
 [paste.server_runner]
 main = zc.resumelb.worker:server_runner

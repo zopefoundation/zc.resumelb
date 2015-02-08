@@ -617,10 +617,10 @@ def test_suite():
                     (re.compile(r'127.0.0.1:\d+'), '127.0.0.1:P'),
                     (re.compile(r"'127.0.0.1', \d+"), "'127.0.0.1', P'"),
                     (re.compile(r"<socket fileno=\d+"), "<socket fileno=F"),
-                    ])
+                    ]),
                 ) + manuel.capture.Manuel(),
             'lb.test', 'pool.test', 'worker.test', 'bytesizedqueue.test',
-            'bufferedqueue.test', 'single_version.test',
+            'bufferedqueue.test', 'single_version.test', 'nagios.rst',
             setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
 
         manuel.testing.TestSuite(
