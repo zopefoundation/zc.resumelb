@@ -324,9 +324,9 @@ def get_lb_status(args=None):
         status = json.loads(status_file.read())
         status_file.close()
         status_socket.close()
-        now = int(time.time())
         workers = status['workers']
         if workers:
+            now = time.time()
             print '  backlog: %s, mean backlog: %.1f' % (
                 status['backlog'], status['mean_backlog'])
             print '  workers: %s, mean backlog per worker: %.1f' % (
@@ -338,6 +338,6 @@ def get_lb_status(args=None):
             for name, bl, mbl, start in sorted(workers):
                 print worker_format % (
                     name, bl, "%.1f" % mbl,
-                    now-start if start is not None else '-')
+                    ("%.1f" % (now-start) if start is not None else '-'))
         else:
             print 'This load-balancer has no workers!'
