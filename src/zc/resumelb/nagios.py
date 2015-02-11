@@ -5,7 +5,9 @@ import argparse
 import gevent.socket
 import json
 import socket
+import sys
 import time
+
 
 parser = argparse.ArgumentParser()
 
@@ -35,7 +37,6 @@ parser.add_argument('--minimum-worker-error', '-W', type=int,
 parser.add_argument('--metrics', '-m', action="store_true",
                     help='Output metrics.')
 
-import sys
 
 def _check(value, warn, error, format, message, severity, sign=1):
     if error is not None and sign*value >= sign*error:

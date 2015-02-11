@@ -62,7 +62,7 @@ the -h option:
                             Maximim request age at which we error.
       --metrics, -m         Output metrics.
 
-    Faux status server:
+Faux status server:
 
     >>> import zc.resumelb.nagiosfauxstatus
     >>> pool = zc.resumelb.nagiosfauxstatus.Pool()
@@ -114,7 +114,6 @@ This results in output like the following::
       --minimum-worker-error MINIMUM_WORKER_ERROR, -W MINIMUM_WORKER_ERROR
                             Maximim request age at which we error.
       --metrics, -m         Output metrics.
-
 
 None of the options have defaults.  If you run the monitor without
 options, you'll get an error reminding you that you need to specify
