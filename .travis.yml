@@ -1,6 +1,6 @@
 language: python
 install:
-    - easy_install pip
+    - pip install -U setuptools
     - python bootstrap.py
     - bin/buildout
 script:
