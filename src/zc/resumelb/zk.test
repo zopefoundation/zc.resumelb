@@ -334,7 +334,7 @@ There's also a command-line client for the status server:
       workers: 2, mean backlog per worker: 0.3
     <BLANKLINE>
                             worker backlog mean bl     age
-                   127.0.0.1:48407       1     0.7       0
+                   127.0.0.1:48407       1     0.7     0.1
                    127.0.0.1:52308       0     0.0       -
 
 
