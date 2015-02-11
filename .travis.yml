@@ -1,5 +1,6 @@
 language: python
 install:
+    - pip install -U setuptools
     - python bootstrap.py
     - bin/buildout
 script:

@@ -108,7 +108,31 @@ class LB:
             finally:
                 self.pool.put(worker)
 
-class Pool:
+class PoolStatus:
+
+    def status(self):
+        return dict(
+            backlog = self.backlog,
+            mean_backlog = self.mbacklog,
+            workers = [
+                (worker.__name__,
+                 worker.backlog,
+                 worker.mbacklog,
+                 (worker.oldest_time if worker.oldest_time else None),
+                 )
+                for worker in sorted(
+                    self.workers, key=lambda w: w.__name__)
+                ],
+            workers_ex = [
+                (worker.__name__,
+                 worker.write_queue.qsize(),
+                 )
+                for worker in sorted(
+                    self.workers, key=lambda w: w.__name__)
+                ],
+            )
+
+class Pool(PoolStatus):
 
     def __init__(self,
                  unskilled_score=None, variance=None, backlog_history=None,
@@ -330,29 +354,6 @@ class Pool:
         worker.backlog -= 1
         assert worker.backlog >= 0
         _decay_backlog(worker, self.worker_decay)
-
-    def status(self):
-        return dict(
-            backlog = self.backlog,
-            mean_backlog = self.mbacklog,
-            workers = [
-                (worker.__name__,
-                 worker.backlog,
-                 worker.mbacklog,
-                 (int(worker.oldest_time)
-                  if worker.oldest_time else None),
-                 )
-                for worker in sorted(
-                    self.workers, key=lambda w: w.__name__)
-                ],
-            workers_ex = [
-                (worker.__name__,
-                 worker.write_queue.qsize(),
-                 )
-                for worker in sorted(
-                    self.workers, key=lambda w: w.__name__)
-                ],
-            )
 
 def _init_backlog(worker):
     worker.backlog  = getattr(worker,  'backlog', 0)

@@ -242,6 +242,8 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+- Nagios monitoring plugin
+
 - You can now supply alternative pool implementations.
 
   Thanks to: https://github.com/zopefoundation/zc.resumelb/pull/3
