@@ -608,7 +608,7 @@ def zkTearDown(test):
     zope.testing.setupstack.tearDown(test)
 
 def test_suite():
-    e1 = r'127.0.0.1:\d+\s+1\s+0.7\s+.1'
+    e1 = r'127.0.0.1:\d+\s+1\s+0.7\s+0.1'
     e2 = r'127.0.0.1:\d+\s+0\s+0.0\s+-'
     return unittest.TestSuite((
         manuel.testing.TestSuite(
