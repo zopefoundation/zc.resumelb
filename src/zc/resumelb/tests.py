@@ -171,8 +171,11 @@ class FauxWorker:
         socket.close()
 
 class FauxPoolWorker:
+
+    oldest_time = None
+
     def __init__(self, name, version=None):
-        self.name = name
+        self.name = self.__name__ = name
         self.version = version
     def __repr__(self):
         return self.name
@@ -621,6 +624,7 @@ def test_suite():
                 ) + manuel.capture.Manuel(),
             'lb.test', 'pool.test', 'worker.test', 'bytesizedqueue.test',
             'bufferedqueue.test', 'single_version.test', 'nagios.rst',
+            'classlesspool.test',
             setUp=setUp, tearDown=zope.testing.setupstack.tearDown),
 
         manuel.testing.TestSuite(

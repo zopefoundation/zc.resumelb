@@ -248,6 +248,13 @@ Change History
 
   Thanks to: https://github.com/zopefoundation/zc.resumelb/pull/3
 
+- There's a new pool implementation
+  ``zc.resumelb.classlesspool.ClasslessPool`` that allocates work
+  solely based on backlogs, ignoring resumes.  This is useful for
+  smaller applications that don't have large resident sets or a good
+  way to segregate requests, but that can benefit from ZooKeeper-aware
+  load balancing.
+
 0.7.5 (2014-11-18)
 ------------------
 
