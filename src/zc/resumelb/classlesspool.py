@@ -84,3 +84,6 @@ class ClasslessPool(zc.resumelb.lb.PoolBase):
 
     def update_settings(self, settings):
         pass
+
+def classifier(_):
+    return ''

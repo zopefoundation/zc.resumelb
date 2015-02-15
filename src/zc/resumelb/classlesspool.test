@@ -160,3 +160,16 @@ off a request.
      'mean_backlog': 0,
      'workers': [('w2', 1, 1, None), ('w3', 0, 0, None)],
      'workers_ex': [('w2', 0), ('w3', 0)]}
+
+Classifier
+==========
+
+When using the classless pool, you don't case what the request
+classifier generates.  There's a more or less null classifier:
+
+    >>> zc.resumelb.classlesspool.classifier(42)
+    ''
+    >>> zc.resumelb.classlesspool.classifier(None)
+    ''
+    >>> zc.resumelb.classlesspool.classifier(w1)
+    ''
