@@ -4,8 +4,8 @@ LB's and workers communicate via a simple protocol
 They send each other sized network messages.  The network messages
 consist of:
 
-- 4-byte data size
 - 4-byte request number
+- 4-byte data size
 - Marshalled data
 
 If request number is 0, the marshalled data:
