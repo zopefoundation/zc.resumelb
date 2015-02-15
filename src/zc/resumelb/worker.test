@@ -601,7 +601,7 @@ Now, we'll make some requests:
     C 0.22 2012-02-05 01:02:03.020456
     >>> now += datetime.timedelta(microseconds=10000)
     >>> write_message(worker_socket, 11, '')
-    >>> read_message(worker_socket) # doctest: +ELLIPSIS
+    >>> read_message(worker_socket); gevent.sleep(.01) # doctest: +ELLIPSIS
     I 0.11 2012-02-05 01:02:03.030456 0
     T 0.22 2012-02-05 01:02:03.030456 test
     - 0.22 2012-02-05 01:02:03.030456 test2
