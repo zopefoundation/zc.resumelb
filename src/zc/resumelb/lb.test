@@ -565,10 +565,22 @@ Now, let's finish the outstanding requests:
     >>> shutdown_greenlet.ready()
     True
 
-At this point, the worker sockets are closed:
+At this point, the worker sockets are closed. If we read from them,
+we'll get an empty string (or a keep-alive message, which we'll
+ignore):
 
-    >>> [w.socket.recv(1) for w in workers]
-    ['', '']
+    >>> import zc.resumelb.util
+    >>> def at_end(sock):
+    ...     while 1:
+    ...         data = sock.recv(9)
+    ...         if data == zc.resumelb.util.KEEP_ALIVE:
+    ...             continue
+    ...         if data:
+    ...             print 'unexpected data', repr(data)
+    ...         else:
+    ...             break
+    >>> for w in workers:
+    ...     at_end(w.socket)
 
 Built-in request classifiers
 ============================
