@@ -7,10 +7,6 @@ import llist
 import zc.resumelb.lb
 
 class ClasslessPool(zc.resumelb.lb.PoolBase):
-    """Manage and assign work to workers.
-    """
-    # This was added to define how the lb uses a pool, now that
-    # alternate pool implementations can be provided.
 
     def __init__(self, single_version=False):
         super(ClasslessPool, self).__init__(single_version)
@@ -20,8 +16,6 @@ class ClasslessPool(zc.resumelb.lb.PoolBase):
         self.event = gevent.event.Event()
 
     def get(self, request_class, timeout=None):
-        """Get a worker to handle the given request class (string)
-        """
         line = self.line
         if not line:
             self.event.wait(timeout)
@@ -67,8 +61,6 @@ class ClasslessPool(zc.resumelb.lb.PoolBase):
             self.event.set()
 
     def put(self, worker):
-        """Notify the pool that the worker has completed a request.
-        """
         self.backlog -= 1
         assert self.backlog >= 0, self.backlog
         worker.backlog -= 1
