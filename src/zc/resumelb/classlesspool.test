@@ -1,0 +1,175 @@
+===============================================
+Classless (Non-resume-based) load balancer pool
+===============================================
+
+For smaller applications, it's useful to have a ZooKeeper-aware
+load-balancer that avoids the need to update traditional load-balancer
+configurations.
+
+The load balancer works by connecting to workers, creating local
+workers for each connection, adding local workers to the pool, and
+by accepting wsgi request, getting local workers from the pool and
+passing the wsgi requests to the local workers, which, in turn,
+forward the requests to the remote workers.
+
+We'll test the pool with stand-ins for the local workers.
+
+    >>> import zc.resumelb.classlesspool
+    >>> pool = zc.resumelb.classlesspool.ClasslessPool()
+
+The get method is used to get a worker from the pool.  A request class
+and an optional timeout is passed. (The timeout is mainly useful for
+testing.)
+
+    >>> pool.get('foo', 0.0)
+
+We didn't get a worker (we timed out), because we haven't added one.
+
+    >>> from zc.resumelb.tests import FauxPoolWorker as Worker
+
+    >>> w1 = Worker('w1')
+
+    >>> pool.new_resume(w1, {})
+
+    >>> pool.get('foo', 0.0)
+    w1
+
+This time, we got the one we registered.
+
+If we create another and register it, we'll get it, because it
+has a backlog of 0, while w1 has a backlog of 1:
+
+   >>> w2 = Worker('w2')
+   >>> pool.new_resume(w2, {})
+
+   >>> pool.get('foo')
+   w2
+
+If we call get again, we'll get w1. This is because w1 and w2 have the
+same backlog, but w2 went to the back of the line.
+
+   >>> pool.get('foo')
+   w1
+
+And so on:
+
+   >>> pool.get('foo')
+   w2
+
+The request class doesn't matter.
+
+   >>> pool.get('bar')
+   w1
+   >>> pool.get('bar')
+   w2
+
+We can ask for a pool's status:
+
+  >>> import pprint
+  >>> pprint.pprint(pool.status()) # doctest: +NORMALIZE_WHITESPACE
+    {'backlog': 6,
+     'mean_backlog': 3,
+     'workers': [('w1', 3, 3, None),
+                 ('w2', 3, 3, None)],
+     'workers_ex': [('w1', 0), ('w2', 0)]}
+
+When a worker is done doing its work, we put it back in the pool:
+
+  >>> pool.put(w2)
+  >>> pool.put(w2)
+
+    >>> pprint.pprint(pool.status()) # doctest: +NORMALIZE_WHITESPACE
+    {'backlog': 4,
+     'mean_backlog': 2,
+     'workers': [('w1', 3, 3, None),
+                 ('w2', 1, 1, None)],
+     'workers_ex': [('w1', 0), ('w2', 0)]}
+
+It will be preferred until it's backlog grows:
+
+    >>> pool.get('bar')
+    w2
+    >>> pool.get('bar')
+    w2
+    >>> pool.get('bar')
+    w1
+
+
+Worker disconnect
+=================
+
+When a worker disconnects, it's removed from the pool:
+
+    >>> pool.remove(w1)
+    >>> for i in range(4): pool.put(w1)
+
+    >>> pprint.pprint(pool.status())
+    {'backlog': 3,
+     'mean_backlog': 3,
+     'workers': [('w2', 3, 3, None)],
+     'workers_ex': [('w2', 0)]}
+
+    >>> pool.remove(w2)
+    >>> for i in range(3): pool.put(w2)
+
+    >>> pprint.pprint(pool.status())
+    {'backlog': 0, 'mean_backlog': None, 'workers': [], 'workers_ex': []}
+
+Single-Version
+==============
+
+If a pool is in single-version mode, only workers from the majority
+version will be used:
+
+    >>> pool = zc.resumelb.classlesspool.ClasslessPool(single_version=True)
+    >>> w1.version = 1
+    >>> pool.new_resume(w1, None)
+    >>> pool.version
+    1
+    >>> w2.version = 2
+    >>> pool.new_resume(w2, None)
+    >>> pool.version
+    1
+    >>> pool.get('')
+    w1
+    >>> pprint.pprint(pool.status())
+    {'backlog': 1,
+     'mean_backlog': 1,
+     'workers': [('w1', 1, 1, None)],
+     'workers_ex': [('w1', 0)]}
+
+    >>> w3 = Worker('w3')
+    >>> w3.version = 2
+    >>> pool.new_resume(w3, None)
+    >>> pool.version
+    2
+    >>> pool.get('')
+    w2
+    >>> pprint.pprint(pool.status())
+    {'backlog': 2,
+     'mean_backlog': 1,
+     'workers': [('w2', 1, 1, None), ('w3', 0, 0, None)],
+     'workers_ex': [('w2', 0), ('w3', 0)]}
+
+Note that the pool backlog still reflects w1, which is still working
+off a request.
+
+    >>> pool.put(w1)
+    >>> pprint.pprint(pool.status())
+    {'backlog': 1,
+     'mean_backlog': 0,
+     'workers': [('w2', 1, 1, None), ('w3', 0, 0, None)],
+     'workers_ex': [('w2', 0), ('w3', 0)]}
+
+Classifier
+==========
+
+When using the classless pool, you don't care what the request
+classifier generates.  There's a more or less null classifier:
+
+    >>> zc.resumelb.classlesspool.classifier(42)
+    ''
+    >>> zc.resumelb.classlesspool.classifier(None)
+    ''
+    >>> zc.resumelb.classlesspool.classifier(w1)
+    ''

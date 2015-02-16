@@ -27,7 +27,7 @@ class Worker:
         if self.backlog:
             return time.time() - self.backlog * .1
 
-class Pool(zc.resumelb.lb.PoolStatus):
+class Pool(zc.resumelb.lb.PoolBase):
 
     backlog = 0
 
