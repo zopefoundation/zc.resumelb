@@ -9,8 +9,8 @@ configurations.
 The load balancer works by connecting to workers, creating local
 workers for each connection, adding local workers to the pool, and
 by accepting wsgi request, getting local workers from the pool and
-passing the wsgi requests to the local workers, which, in term,
-forwward the requests to the remote workers.
+passing the wsgi requests to the local workers, which, in turn,
+forward the requests to the remote workers.
 
 We'll test the pool with stand-ins for the local workers.
 
@@ -98,7 +98,7 @@ It will be preferred until it's backlog grows:
 Worker disconnect
 =================
 
-When a worker disconnect, it's removed from the pool:
+When a worker disconnects, it's removed from the pool:
 
     >>> pool.remove(w1)
     >>> for i in range(4): pool.put(w1)
@@ -164,7 +164,7 @@ off a request.
 Classifier
 ==========
 
-When using the classless pool, you don't case what the request
+When using the classless pool, you don't care what the request
 classifier generates.  There's a more or less null classifier:
 
     >>> zc.resumelb.classlesspool.classifier(42)

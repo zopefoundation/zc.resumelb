@@ -7,9 +7,9 @@ class IPool(zope.interface.Interface):
     # alternate pool implementations can be provided.
 
     def __init__(single_version=False):
-        """Initializd the pool
+        """Initializd the pool.
 
-        The ``single_version`` argument is supllied by name.
+        The ``single_version`` argument is supplied by name.
         If true, then the pool should only use workers of the same
         version for which the highest number of workers are running
         that version.
@@ -18,14 +18,14 @@ class IPool(zope.interface.Interface):
     backlog = zope.interface.Attribute("number of active requests")
 
     def get(request_class):
-        """Get a worker to handle the given request class (string)
+        """Get a worker to handle the given request class (string).
         """
 
     mbacklog = zope.interface.Attribute(
         "(possibly time-weighted) mean worker backlog for the load balancer")
 
     def new_resume(worker, data):
-        """Update the resume for a worker
+        """Update the resume for a worker.
 
         If the worker isn't in the pool, add it.
         """
@@ -48,4 +48,4 @@ class IPool(zope.interface.Interface):
         The settings argument should be used once and not modified.
         """
 
-    workers = zope.interface.Attribute("iterable of workers")
+    workers = zope.interface.Attribute("Iterable of workers.")
