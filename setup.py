@@ -33,16 +33,7 @@ main = zc.resumelb.worker:server_runner
 zk   = zc.resumelb.zk:worker
 """
 
-# copy README to root.
-import os
-here = os.path.dirname(__file__)
-with open(
-    os.path.join(here, *(['src'] + name.split('.') + ['README.txt']))
-    ) as inp:
-    with open(os.path.join(here, 'README.txt'), 'w') as outp:
-        outp.write(inp.read())
-
-long_description = open('README.txt').read().decode('latin-1').encode('utf-8')
+long_description = open('README.rst').read().decode('latin-1').encode('utf-8')
 
 from setuptools import setup
 
@@ -68,5 +59,3 @@ setup(
     # To get gevent 1.0b1
     dependency_links = ['http://code.google.com/p/gevent/downloads/list'],
     )
-
-os.remove(os.path.join(here, 'README.txt'))
