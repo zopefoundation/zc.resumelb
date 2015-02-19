@@ -242,7 +242,10 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-- Nagios monitoring plugin
+1.0.0 (2015-02-19)
+------------------
+
+- Nagios monitoring plugin. See src/zc/resumelb/nagios.rst.
 
 - You can now supply alternative pool implementations.
 
