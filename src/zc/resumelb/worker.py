@@ -84,7 +84,7 @@ class Worker:
                         'A system error occurred', status=500
                         )(env, start_response)
                     )
-                first = body.next()
+                first = ''
 
             return response[0], first, body
 
