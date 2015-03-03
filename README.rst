@@ -242,6 +242,9 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+1.0.1 (2015-03-03)
+------------------
+
 - Fixed: uncaught applications exceptions were mishandled for HEAD
   requests.
 
