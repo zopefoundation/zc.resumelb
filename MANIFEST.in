@@ -1,2 +1,2 @@
 include *.rst
-recursive-include src/zc/resumelb *.txt *.test
+recursive-include src *.txt *.test *.rst
