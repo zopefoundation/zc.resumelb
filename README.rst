@@ -242,7 +242,8 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
-- Fixed: uncaught applications were mishandled for HEAD requests.
+- Fixed: uncaught applications exceptions were mishandled for HEAD
+  requests.
 
 1.0.0 (2015-02-19)
 ------------------
