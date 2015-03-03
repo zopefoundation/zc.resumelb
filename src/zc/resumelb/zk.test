@@ -11,10 +11,11 @@ To demonstrate the integration, we'll set up a tree:
     ... /test
     ...   /lb
     ...     /providers
-    ...     /workers
-    ...       history = 32
-    ...       max_skill_age = 90
-    ...       /providers
+    ...     workers -> ../app
+    ...   /app
+    ...     history = 32
+    ...     max_skill_age = 90
+    ...     /providers
     ... """)
 
 There are some things to note about this tree:
@@ -22,6 +23,9 @@ There are some things to note about this tree:
 - We have an lb node, where we'll configure an lb.  It has a workers
   subnode where we'll configure the workers.  This subnode could be a
   regular node, or a symbolic link.
+
+  Here we made it a link because a) that's often useful and b) it was
+  broken in some cases. :)
 
 - Addresses of running workers and load balancers will be registered
   at provider subnodes.
@@ -68,7 +72,7 @@ Let's create a worker, making sure that ZConfig.configureLoggers was called.
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False, loggers='loggers',
     ...         resume_file='resume.mar',
     ...         description='test',
@@ -101,11 +105,11 @@ It loaded its resume from resume.mar:
 It registers its address as an ephemeral subnode of the provider's
 subnode of the given path:
 
-    >>> [waddr] = zk.get_children('/test/lb/workers/providers')
+    >>> [waddr] = zk.get_children('/test/app/providers')
     >>> waddr == "%s:%s" % worker.addr
     True
 
-    >>> meta = zk.get('/test/lb/workers/providers/' + waddr)[1]
+    >>> meta = zk.get('/test/app/providers/' + waddr)[1]
     >>> ephemeralOwner = (meta['ephemeralOwner'] if isinstance(meta, dict)
     ...                   else meta.ephemeralOwner)
     >>> bool(ephemeralOwner)
@@ -113,7 +117,7 @@ subnode of the given path:
 
 And provides some meta data:
 
-    >>> pprint(zk.get_properties('/test/lb/workers/providers/' + waddr))
+    >>> pprint(zk.get_properties('/test/app/providers/' + waddr))
     {u'description': u'test', u'pid': 4195, u'version': u'42'}
 
 Shutdown
@@ -128,7 +132,7 @@ worker down:
 
     >>> gevent.signal.call_args[0][1]()
     >>> gevent.sleep(.01)
-    >>> zk.get_children('/test/lb/workers/providers')
+    >>> zk.get_children('/test/app/providers')
     []
 
     >>> gevent.socket.create_connection(worker.addr) # doctest: +ELLIPSIS
@@ -146,7 +150,7 @@ Let's try again, but this time, don't set up logging:
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False,
     ...         resume_file='resume.mar',
     ...         )
@@ -160,7 +164,7 @@ Let's try again, but this time, set up basic logging:
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False, loggers='INFO',
     ...         resume_file='resume.mar',
     ...         )
@@ -174,7 +178,7 @@ Let's try again, but this time, set up basic logging with a numeric level:
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False, loggers='42',
     ...         resume_file='resume.mar',
     ...         )
@@ -280,7 +284,7 @@ We want to make sure that non-test mode works:
 
     >>> worker2_greenlet = gevent.spawn(zc.resumelb.zk.worker,
     ...     app, None,
-    ...     zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...     zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...     address='127.0.0.1:0')
     >>> gevent.sleep(.01)
 
@@ -475,7 +479,7 @@ Finally, let's test that:
 
     >>> worker_greenlet = gevent.spawn(zc.resumelb.zk.worker,
     ...     app, None,
-    ...     zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...     zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...     address='127.0.0.1:0')
 
     >>> with mock.patch('ZConfig.configureLoggers') as configureLoggers:
@@ -526,7 +530,7 @@ workers must register with a version, or they'll be ignored.
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False, version='42')
     >>> gevent.sleep(.01)
     >>> lb, server = zc.resumelb.zk.lbmain(
@@ -536,7 +540,7 @@ workers must register with a version, or they'll be ignored.
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False, version='42')
     >>> gevent.sleep(.01)
     >>> lb.pool
@@ -560,7 +564,7 @@ takes keyword arguments.
     ...   with mock.patch('logging.basicConfig') as basicConfig:
     ...     worker = zc.resumelb.zk.worker(
     ...         app, None,
-    ...         zookeeper='zookeeper.example.com:2181', path='/test/lb/workers',
+    ...         zookeeper='zookeeper.example.com:2181', path='/test/app',
     ...         address='127.0.0.1:0', run=False, version='42')
     >>> gevent.sleep(.01)
 

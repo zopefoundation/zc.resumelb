@@ -191,7 +191,8 @@ def lbmain(args=None, run=True):
                 ZConfig.configureLoggers(f.read())
 
     zk = zc.zk.ZooKeeper(zookeeper)
-    addrs = zk.children(path+'/workers/providers')
+    worker_path = zk.resolve(path+'/workers/providers')
+    addrs = zk.children(worker_path)
     request_classifier = _resolve(options.request_classifier)
     pool_factory = _resolve(options.pool_factory)
 
@@ -222,7 +223,7 @@ def lbmain(args=None, run=True):
             to_send[0] = dict(
                 (zc.parse_addr.parse_addr(addr),
                  zk.get_properties(
-                     path+'/workers/providers/'+addr).get('version')
+                     worker_path + '/' + addr).get('version')
                  )
                 for addr in addrs)
             awatcher.send()

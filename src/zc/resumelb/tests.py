@@ -244,6 +244,44 @@ def workers_generate_500s_for_bad_apps():
     >>> worker.stop()
     """ #"
 
+def workers_generate_500s_for_bad_apps_HEAD():
+    """If an app is poorly behaved and raises exceptions, a worker
+    will generate a 500.
+
+    >>> def baddapp(*args):
+    ...     raise Exception("I'm a bad-app")
+
+    >>> worker = zc.resumelb.worker.Worker(baddapp, ('127.0.0.1', 0))
+    >>> worker_socket = gevent.socket.create_connection(worker.addr)
+    >>> zc.resumelb.util.read_message(worker_socket)
+    (0, {})
+
+    >>> env = newenv('', '/hi.html', dict(REQUEST_METHOD="HEAD"))
+    >>> handler = zope.testing.loggingsupport.InstalledHandler(
+    ...     'zc.resumelb.worker')
+    >>> zc.resumelb.util.write_message(worker_socket, 1, env, '')
+    >>> print_response(worker_socket, 1)
+    1 500 Internal Server Error
+    Content-Length: 23
+    Content-Type: text/html; charset=UTF-8
+    <BLANKLINE>
+
+    >>> for record in handler.records:
+    ...     print record.name, record.levelname
+    ...     print record.getMessage()
+    ...     if record.exc_info:
+    ...         traceback.print_exception(*record.exc_info)
+    ... # doctest: +ELLIPSIS
+    zc.resumelb.worker ERROR
+    Uncaught application exception for 1
+    Traceback (most recent call last):
+    ...
+    Exception: I'm a bad-app
+
+    >>> handler.uninstall()
+    >>> worker.stop()
+    """ #"
+
 def Buffering_Temporary_Files_are_closed():
     """
     When a worker sends data to an lb faster than it can send it to a

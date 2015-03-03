@@ -242,6 +242,12 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+- Fixed: uncaught applications exceptions were mishandled for HEAD
+  requests.
+
+- Fixed: LB worker paths couldn't be links in single-version mode, or
+  when using alternate pool implementations.
+
 1.0.0 (2015-02-19)
 ------------------
 
