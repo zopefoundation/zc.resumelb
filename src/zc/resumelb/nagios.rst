@@ -131,7 +131,12 @@ metrics output or thresholds.
     3
 
     >>> m('-b3 -B9 -x9 -X19 -a1 -A2 -w2 -W1')
-    OK 3 0 0 -
+    OK 3 0 0 0
+
+    Make sure max_age metric shows 0 when no backlog:
+
+    >>> m('-b3 -B9 -x9 -X19 -a1 -A2 -w2 -W1 -m')
+    OK 3 0 0 0|workers=3 mean_backlog=0 max_backlog=0 max_age=0.0seconds
 
     >>> pool.get(1)
     >>> m('-b3 -B9 -x9 -X19 -a1 -A2 -w2 -W1')

@@ -11,7 +11,7 @@
 # FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
-name, version = 'zc.resumelb', '1.0.1'
+name, version = 'zc.resumelb', '1.0.2'
 
 install_requires = [
     'setuptools', 'gevent >=1.0b1', 'WebOb', 'zc.thread', 'zc.parse_addr',

@@ -242,6 +242,14 @@ maintaining ZooKeeper trees.
 Change History
 ==============
 
+1.0.2 (2015-03-11)
+------------------
+
+- Fixed: the nagios monitor metric for max request age showed -1 when
+  there were no outstanding requests. This was silly.
+
+- Fixed a packaging bug.
+
 1.0.1 (2015-03-03)
 ------------------
 

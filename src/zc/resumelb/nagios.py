@@ -76,7 +76,7 @@ def main(args=None):
     nworkers = len(status['workers'])
     mbacklog = status["mean_backlog"]
     max_backlog = max(w[1] for w in status['workers'])
-    max_age = max((now-w[3] if w[3] else -1) for w in status['workers'])
+    max_age = max((now-w[3] if w[3] else 0) for w in status['workers'])
 
     severity = 0
     message = []
